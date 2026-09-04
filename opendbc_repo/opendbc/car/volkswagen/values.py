@@ -106,6 +106,7 @@ class CarControllerParams:
       self.LDW_STEP = 10                  # LDW_02 message frequency 10Hz
       self.ACC_HUD_STEP = 6
       self.KLR_01_STEP = 6                # KLR_01 message frequency 17Hz
+      self.EA_02_STEP = 2                 # EA_02 relay frequency 50Hz (stock is 10Hz; matches carrot)
       self.STEER_DRIVER_ALLOWANCE = 100   # Begin reducing steering power at 1.0 Nm driver torque
       self.STEER_DRIVER_MAX = 300         # Reach minimum steering power at 3.0 Nm driver torque
       self.STEERING_POWER_MAX = 50
@@ -215,6 +216,7 @@ class WMI(StrEnum):
 class VolkswagenSafetyFlags(IntFlag):
   LONG_CONTROL = 1
   MEB_ALT_CRC = 2
+  MEB_EA_RELAY = 4
 
 
 class VolkswagenFlags(IntFlag):
@@ -223,6 +225,7 @@ class VolkswagenFlags(IntFlag):
   KOMBI_PRESENT = 4
   ALT_GEAR = 32
   STOCK_KLR_PRESENT = 64
+  STOCK_EA_PRESENT = 16384  # Emergency Assist module present (EA_01/EA_02) -> relay its HUD
 
   # Static flags
   PQ = 2

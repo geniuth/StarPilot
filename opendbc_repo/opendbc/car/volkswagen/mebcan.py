@@ -275,3 +275,36 @@ def create_capacitive_wheel_touch(packer, bus, lat_active, klr_stock_values):
       "KLR_Touchauswertung": 10,
     })
   return packer.make_can_msg("KLR_01", bus, values)
+
+
+# Stock EA HUD signals passed straight through by the relay. EA_Unknown only exists on the
+# gen1 DBC, so the relay copies whatever the car's own DBC actually defines.
+EA_02_RELAY_SIGNALS = (
+  "EA_Texte",
+  "ACF_Lampe_Hands_Off",
+  "EA_Infotainment_Anf",
+  "EA_Tueren_Anf",
+  "EA_Innenraumlicht_Anf",
+  "zFAS_Warnblinken",
+  "STP_Primaeranz",
+  "EA_Bremslichtblinken",
+  "EA_Blinken",
+  "EA_Unknown",
+)
+
+
+def create_blinker_control(packer, bus, ea_hud_stock_values, ea_control_stock_values, left_blinker, right_blinker, hide_error):
+  # Relay the Emergency Assist HUD (EA_02): preserves the stock hands-off and blinker state, injects openpilot's
+  # own blinker request, and optionally suppresses the EA error text. EA faults when openpilot replaces its HCA
+  # steering, which the driver otherwise sees in the cluster. This is not the steering wheel icon, that is TA_01.
+  values = {s: ea_hud_stock_values[s] for s in EA_02_RELAY_SIGNALS if s in ea_hud_stock_values}
+
+  if not values.get("EA_Blinken", 0):
+    values["EA_Blinken"] = 1 if left_blinker else (2 if right_blinker else 0)
+
+  if hide_error and ea_control_stock_values.get("EA_Funktionsstatus", 0) in (0, 1, 7, 8):
+    values["EA_Texte"] = 0
+    if "EA_Unknown" in values:
+      values["EA_Unknown"] = 1
+
+  return packer.make_can_msg("EA_02", bus, values)

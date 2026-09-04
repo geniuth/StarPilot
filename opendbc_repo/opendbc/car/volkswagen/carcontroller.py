@@ -123,6 +123,18 @@ class CarController(CarControllerBase):
         can_sends.append(mebcan.create_capacitive_wheel_touch(self.packer_pt, self.CAN.cam, CC.latActive, CS.klr_stock_values))
         can_sends.append(mebcan.create_capacitive_wheel_touch(self.packer_pt, self.CAN.pt, CC.latActive, CS.klr_stock_values))
 
+    # **** Emergency Assist HUD relay ************************************** #
+
+    if self.CP.flags & VolkswagenFlags.STOCK_EA_PRESENT and CS.ea_hud_stock_values:
+      if self.frame % self.CCP.EA_02_STEP == 0:
+        # Don't relay a blinker the car is already flashing on its own
+        blinker_active = CS.left_blinker_active or CS.right_blinker_active
+        left_blinker = CC.leftBlinker and not blinker_active
+        right_blinker = CC.rightBlinker and not blinker_active
+        can_sends.append(mebcan.create_blinker_control(self.packer_pt, self.CAN.pt, CS.ea_hud_stock_values,
+                                                       CS.ea_control_stock_values, left_blinker, right_blinker,
+                                                       CC.latActive))
+
     # **** Acceleration Controls ******************************************** #
 
     if self.CP.openpilotLongitudinalControl:

@@ -18,6 +18,7 @@ MSG_GRA_ACC_01 = 0x12B
 MSG_QFK_01     = 0x13D
 MSG_ACC_18     = 0x14D
 MSG_KLR_01     = 0x25D
+MSG_EA_02      = 0x1F0
 MSG_TA_01      = 0x26B
 MSG_ACC_19     = 0x300
 MSG_HCA_03     = 0x303
@@ -339,4 +340,35 @@ class TestVolkswagenMebGen2LongSafety(TestVolkswagenMebLongSafety):
     self.safety = libsafety_py.libsafety
     self.safety.set_safety_hooks(CarParams.SafetyModel.volkswagenMeb,
                                  VolkswagenSafetyFlags.LONG_CONTROL | VolkswagenSafetyFlags.MEB_ALT_CRC)
+    self.safety.init_tests()
+
+
+class TestVolkswagenMebStockEaRelaySafety(TestVolkswagenMebStockSafety):
+  # Cars with a stock Emergency Assist module: openpilot relays EA_02, so panda allows it on bus 0
+  # and blocks the camera's copy from being forwarded there.
+  TX_MSGS = [[MSG_HCA_03, 0], [MSG_LDW_02, 0], [MSG_GRA_ACC_01, 0], [MSG_GRA_ACC_01, 2],
+             [MSG_KLR_01, 0], [MSG_KLR_01, 2], [MSG_EA_02, 0]]
+  FWD_BLACKLISTED_ADDRS = {0: [MSG_KLR_01], 2: [MSG_HCA_03, MSG_LDW_02, MSG_EA_02]}
+  RELAY_MALFUNCTION_ADDRS = {0: (MSG_HCA_03, MSG_LDW_02, MSG_EA_02), 2: (MSG_KLR_01,)}
+
+  def setUp(self):
+    self.packer = CANPackerSafety("vw_meb_generated")
+    self.safety = libsafety_py.libsafety
+    self.safety.set_safety_hooks(CarParams.SafetyModel.volkswagenMeb, VolkswagenSafetyFlags.MEB_EA_RELAY)
+    self.safety.init_tests()
+
+
+class TestVolkswagenMebLongEaRelaySafety(TestVolkswagenMebLongSafety):
+  TX_MSGS = [[MSG_HCA_03, 0], [MSG_LDW_02, 0], [MSG_ACC_19, 0], [MSG_ACC_18, 0],
+             [MSG_TA_01, 0], [MSG_KLR_01, 0], [MSG_KLR_01, 2], [MSG_EA_02, 0]]
+  FWD_BLACKLISTED_ADDRS = {0: [MSG_KLR_01],
+                           2: [MSG_HCA_03, MSG_LDW_02, MSG_ACC_19, MSG_ACC_18, MSG_TA_01, MSG_EA_02]}
+  RELAY_MALFUNCTION_ADDRS = {0: (MSG_HCA_03, MSG_LDW_02, MSG_ACC_19, MSG_ACC_18, MSG_TA_01, MSG_EA_02),
+                             2: (MSG_KLR_01,)}
+
+  def setUp(self):
+    self.packer = CANPackerSafety("vw_meb_generated")
+    self.safety = libsafety_py.libsafety
+    self.safety.set_safety_hooks(CarParams.SafetyModel.volkswagenMeb,
+                                 VolkswagenSafetyFlags.LONG_CONTROL | VolkswagenSafetyFlags.MEB_EA_RELAY)
     self.safety.init_tests()

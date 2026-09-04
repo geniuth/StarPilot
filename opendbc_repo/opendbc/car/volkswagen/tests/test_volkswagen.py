@@ -5,6 +5,10 @@ from opendbc.car.structs import CarParams
 from opendbc.car.volkswagen.interface import CarInterface
 from opendbc.car.volkswagen.values import CAR, FW_QUERY_CONFIG, WMI, VolkswagenFlags, VolkswagenSafetyFlags
 from opendbc.car.volkswagen.fingerprints import FW_VERSIONS
+from opendbc.car.volkswagen import mebcan
+from opendbc.can.packer import CANPacker
+from opendbc.car import Bus
+from opendbc.car.volkswagen.values import DBC
 
 Ecu = CarParams.Ecu
 
@@ -59,6 +63,39 @@ class TestVolkswagenPlatformConfigs:
     assert cp.openpilotLongitudinalControl
     assert not cp.pcmCruise
     assert cp.safetyConfigs[-1].safetyParam & VolkswagenSafetyFlags.LONG_CONTROL
+
+  def test_meb_ea_relay_detection(self):
+    # The EA HUD relay is only armed, in the car port and in panda, when the car has an EA module
+    fingerprint = {bus: {} for bus in range(8)}
+    fingerprint[1][0x13D] = 32
+    cp = CarInterface.get_params(CAR.VOLKSWAGEN_ID4_MK1, fingerprint, [], False, False, False, None)
+    assert not cp.flags & VolkswagenFlags.STOCK_EA_PRESENT
+    assert not cp.safetyConfigs[-1].safetyParam & VolkswagenSafetyFlags.MEB_EA_RELAY
+
+    fingerprint[2][0x1A4] = 8  # EA_01
+    fingerprint[2][0x1F0] = 8  # EA_02
+    cp = CarInterface.get_params(CAR.VOLKSWAGEN_ID4_MK1, fingerprint, [], False, False, False, None)
+    assert cp.flags & VolkswagenFlags.STOCK_EA_PRESENT
+    assert cp.safetyConfigs[-1].safetyParam & VolkswagenSafetyFlags.MEB_EA_RELAY
+
+  def test_meb_ea_relay_packs_on_every_meb_dbc(self, subtests):
+    # EA_Unknown only exists on the gen1 DBC, so the relay must not assume a fixed signal set
+    for car in self.MEB_CARS:
+      with subtests.test(car=car.name):
+        packer = CANPacker(DBC[car][Bus.pt])
+        stock = {s: 0 for s in mebcan.EA_02_RELAY_SIGNALS if s in packer.dbc.name_to_msg["EA_02"].sigs}
+        stock["EA_Texte"] = 5
+
+        addr, dat, _ = mebcan.create_blinker_control(packer, 0, stock, {"EA_Funktionsstatus": 0}, True, False, False)
+        assert addr == 0x1F0
+        assert len(dat) == 8
+
+        # openpilot's blinker request only fills in when the car isn't already flashing one
+        lit = dict(stock, EA_Blinken=2)
+        mebcan.create_blinker_control(packer, 0, lit, {"EA_Funktionsstatus": 0}, True, False, False)
+
+        # hiding the EA error must work whether or not this DBC has EA_Unknown
+        mebcan.create_blinker_control(packer, 0, stock, {"EA_Funktionsstatus": 1}, False, False, True)
 
   def test_taos_longitudinal_actuator_delay(self):
     taos_cp = CarInterface.get_non_essential_params(CAR.VOLKSWAGEN_TAOS_MK1)

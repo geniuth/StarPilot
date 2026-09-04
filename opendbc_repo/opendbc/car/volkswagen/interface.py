@@ -71,6 +71,10 @@ class CarInterface(CarInterfaceBase):
       ret.enableBsm = 0x24C in fingerprint[0]
       if 0x25D in fingerprint[0]:
         ret.flags |= VolkswagenFlags.STOCK_KLR_PRESENT.value
+      if all(msg in fingerprint[2] for msg in (0x1A4, 0x1F0)):  # EA_01, EA_02
+        ret.flags |= VolkswagenFlags.STOCK_EA_PRESENT.value
+        # Panda only blocks the stock EA HUD from being forwarded when openpilot relays its own
+        safety_configs[0].safetyParam |= VolkswagenSafetyFlags.MEB_EA_RELAY.value
       if 0x3DC in fingerprint[0]:
         ret.flags |= VolkswagenFlags.ALT_GEAR.value
 

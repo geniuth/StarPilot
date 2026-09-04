@@ -24,6 +24,10 @@ class CarState(CarStateBase):
     self.travel_assist_available = False
     self.curvature_meas = 0.
     self.klr_stock_values = {}
+    self.ea_hud_stock_values = {}
+    self.ea_control_stock_values = {}
+    self.left_blinker_active = False
+    self.right_blinker_active = False
 
   def update_button_enable(self, buttonEvents: list[structs.CarState.ButtonEvent]):
     if not self.CP.pcmCruise:
@@ -229,6 +233,12 @@ class CarState(CarStateBase):
     self.ldw_stock_values = cam_cp.vl["LDW_02"] if self.CP.networkLocation == NetworkLocation.fwdCamera else {}
     self.gra_stock_values = pt_cp.vl["GRA_ACC_01"]
     self.klr_stock_values = pt_cp.vl["KLR_01"] if self.CP.flags & VolkswagenFlags.STOCK_KLR_PRESENT else {}
+    # Stock turn signal state, so the EA HUD relay doesn't double up on a blinker the car already lit
+    self.left_blinker_active = bool(pt_cp.vl["Blinkmodi_02"]["BM_links"])
+    self.right_blinker_active = bool(pt_cp.vl["Blinkmodi_02"]["BM_rechts"])
+    if self.CP.flags & VolkswagenFlags.STOCK_EA_PRESENT:
+      self.ea_hud_stock_values = cam_cp.vl["EA_02"]
+      self.ea_control_stock_values = cam_cp.vl["EA_01"]
 
     ret.buttonEvents = self.create_button_events(pt_cp, self.CCP.BUTTONS)
     ret.lowSpeedAlert = self.update_low_speed_alert(ret.vEgo)

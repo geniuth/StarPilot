@@ -12,6 +12,7 @@
 #define MSG_Motor_51         0x10BU   // RX for TSK state and accel pedal
 #define MSG_KLR_01           0x25DU   // TX, for capacitive steering wheel
 #define MSG_TA_01            0x26BU   // TX by OP, Travel Assist status
+#define MSG_EA_02            0x1F0U   // TX by OP, Emergency Assist HUD relay
 
 static bool volkswagen_meb_alt_crc = false;
 
@@ -106,6 +107,16 @@ static safety_config volkswagen_meb_init(uint16_t param) {
     {MSG_KLR_01, 2, 8, .check_relay = true},
   };
 
+  static const CanMsg VOLKSWAGEN_MEB_STOCK_EA_TX_MSGS[] = {
+    {MSG_HCA_03, 0, 24, .check_relay = true},
+    {MSG_GRA_ACC_01, 0, 8, .check_relay = false},
+    {MSG_GRA_ACC_01, 2, 8, .check_relay = false},
+    {MSG_LDW_02, 0, 8, .check_relay = true},
+    {MSG_KLR_01, 0, 8, .check_relay = false},
+    {MSG_KLR_01, 2, 8, .check_relay = true},
+    {MSG_EA_02, 0, 8, .check_relay = true},
+  };
+
   static const CanMsg VOLKSWAGEN_MEB_LONG_TX_MSGS[] = {
     {MSG_HCA_03, 0, 24, .check_relay = true},
     {MSG_LDW_02, 0, 8, .check_relay = true},
@@ -114,6 +125,17 @@ static safety_config volkswagen_meb_init(uint16_t param) {
     {MSG_ACC_19, 0, 48, .check_relay = true},
     {MSG_ACC_18, 0, 32, .check_relay = true},
     {MSG_TA_01, 0, 8, .check_relay = true},
+  };
+
+  static const CanMsg VOLKSWAGEN_MEB_LONG_EA_TX_MSGS[] = {
+    {MSG_HCA_03, 0, 24, .check_relay = true},
+    {MSG_LDW_02, 0, 8, .check_relay = true},
+    {MSG_KLR_01, 0, 8, .check_relay = false},
+    {MSG_KLR_01, 2, 8, .check_relay = true},
+    {MSG_ACC_19, 0, 48, .check_relay = true},
+    {MSG_ACC_18, 0, 32, .check_relay = true},
+    {MSG_TA_01, 0, 8, .check_relay = true},
+    {MSG_EA_02, 0, 8, .check_relay = true},
   };
 
   static RxCheck volkswagen_meb_rx_checks[] = {
@@ -130,21 +152,43 @@ static safety_config volkswagen_meb_init(uint16_t param) {
 
   volkswagen_common_init();
   const uint16_t FLAG_VOLKSWAGEN_MEB_ALT_CRC = 2;
+  const uint16_t FLAG_VOLKSWAGEN_MEB_EA_RELAY = 4;
   volkswagen_meb_alt_crc = GET_FLAG(param, FLAG_VOLKSWAGEN_MEB_ALT_CRC);
+  const bool volkswagen_meb_ea_relay = GET_FLAG(param, FLAG_VOLKSWAGEN_MEB_EA_RELAY);
 
 #ifdef ALLOW_DEBUG
   volkswagen_longitudinal = GET_FLAG(param, FLAG_VOLKSWAGEN_LONG_CONTROL);
 #endif
 
   safety_config ret;
-  if (volkswagen_longitudinal && volkswagen_meb_alt_crc) {
-    ret = BUILD_SAFETY_CFG(volkswagen_meb_gen2_rx_checks, VOLKSWAGEN_MEB_LONG_TX_MSGS);
-  } else if (volkswagen_longitudinal) {
-    ret = BUILD_SAFETY_CFG(volkswagen_meb_rx_checks, VOLKSWAGEN_MEB_LONG_TX_MSGS);
-  } else if (volkswagen_meb_alt_crc) {
-    ret = BUILD_SAFETY_CFG(volkswagen_meb_gen2_rx_checks, VOLKSWAGEN_MEB_STOCK_TX_MSGS);
+  if (volkswagen_longitudinal) {
+    if (volkswagen_meb_alt_crc) {
+      if (volkswagen_meb_ea_relay) {
+        ret = BUILD_SAFETY_CFG(volkswagen_meb_gen2_rx_checks, VOLKSWAGEN_MEB_LONG_EA_TX_MSGS);
+      } else {
+        ret = BUILD_SAFETY_CFG(volkswagen_meb_gen2_rx_checks, VOLKSWAGEN_MEB_LONG_TX_MSGS);
+      }
+    } else {
+      if (volkswagen_meb_ea_relay) {
+        ret = BUILD_SAFETY_CFG(volkswagen_meb_rx_checks, VOLKSWAGEN_MEB_LONG_EA_TX_MSGS);
+      } else {
+        ret = BUILD_SAFETY_CFG(volkswagen_meb_rx_checks, VOLKSWAGEN_MEB_LONG_TX_MSGS);
+      }
+    }
   } else {
-    ret = BUILD_SAFETY_CFG(volkswagen_meb_rx_checks, VOLKSWAGEN_MEB_STOCK_TX_MSGS);
+    if (volkswagen_meb_alt_crc) {
+      if (volkswagen_meb_ea_relay) {
+        ret = BUILD_SAFETY_CFG(volkswagen_meb_gen2_rx_checks, VOLKSWAGEN_MEB_STOCK_EA_TX_MSGS);
+      } else {
+        ret = BUILD_SAFETY_CFG(volkswagen_meb_gen2_rx_checks, VOLKSWAGEN_MEB_STOCK_TX_MSGS);
+      }
+    } else {
+      if (volkswagen_meb_ea_relay) {
+        ret = BUILD_SAFETY_CFG(volkswagen_meb_rx_checks, VOLKSWAGEN_MEB_STOCK_EA_TX_MSGS);
+      } else {
+        ret = BUILD_SAFETY_CFG(volkswagen_meb_rx_checks, VOLKSWAGEN_MEB_STOCK_TX_MSGS);
+      }
+    }
   }
   return ret;
 }
