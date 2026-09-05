@@ -75,6 +75,17 @@ def camera_run(started: bool, params: Params, CP: car.CarParams, starpilot_toggl
 def livestream(started: bool, params: Params, CP: car.CarParams, starpilot_toggles: SimpleNamespace) -> bool:
   return params.get_bool("IsLiveStreaming")
 
+# Wayon remote live view (offroad). The server runs whenever the cloud config is present;
+# when a viewer connects it touches WAYON_LIVE_ACTIVE_PATH to bring up camerad/stream_encoderd.
+WAYON_CLOUD_CONFIG_PATH = "/data/wayon_cloud/config.json"
+WAYON_LIVE_ACTIVE_PATH = "/tmp/wayon_live.active"
+
+def wayon_remote_ready(started: bool, params: Params, CP: car.CarParams, starpilot_toggles: SimpleNamespace) -> bool:
+  return os.path.isfile(WAYON_CLOUD_CONFIG_PATH)
+
+def wayon_live_streaming(started: bool, params: Params, CP: car.CarParams, starpilot_toggles: SimpleNamespace) -> bool:
+  return os.path.isfile(WAYON_LIVE_ACTIVE_PATH)
+
 def or_(*fns):
   return lambda *args: operator.or_(*(fn(*args) for fn in fns))
 
@@ -121,11 +132,12 @@ procs = [
 
   NativeProcess("loggerd", "system/loggerd", ["./loggerd"], and_(allow_logging, logging)),
   NativeProcess("encoderd", "system/loggerd", ["./encoderd"], and_(allow_logging, only_onroad)),
-  NativeProcess("stream_encoderd", "system/loggerd", ["./encoderd", "--stream"], or_(and_(livestream, not_(iscar)), notcar)),
+  NativeProcess("stream_encoderd", "system/loggerd", ["./encoderd", "--stream"],
+                or_(or_(and_(livestream, not_(iscar)), notcar), wayon_live_streaming)),
   PythonProcess("logmessaged", "system.logmessaged", always_run),
 
-  NativeProcess("camerad", "system/camerad", ["./camerad"], or_(camera_run, livestream), enabled=not WEBCAM,
-                watchdog_max_dt=CAMERAD_WATCHDOG_MAX_DT),
+  NativeProcess("camerad", "system/camerad", ["./camerad"], or_(or_(camera_run, livestream), wayon_live_streaming),
+                enabled=not WEBCAM, watchdog_max_dt=CAMERAD_WATCHDOG_MAX_DT),
   PythonProcess("webcamerad", "tools.webcam.camerad", driverview, enabled=WEBCAM),
   PythonProcess("proclogd", "system.proclogd", and_(allow_logging, only_onroad), enabled=platform.system() != "Darwin"),
   PythonProcess("journald", "system.journald", and_(allow_logging, only_onroad), platform.system() != "Darwin"),
@@ -170,6 +182,11 @@ procs = [
   PythonProcess("webrtcd", "system.webrtc.webrtcd", or_(and_(livestream, not_(iscar)), notcar)),
   PythonProcess("webjoystick", "tools.bodyteleop.web", notcar),
   PythonProcess("joystick", "tools.joystick.joystick_control", and_(joystick, iscar)),
+
+  # Wayon remote (all gated on /data/wayon_cloud/config.json existing)
+  PythonProcess("wayon_live", "system.wayon_live_stream", wayon_remote_ready),
+  PythonProcess("wayon_remote", "system.wayon_remote", wayon_remote_ready),
+  PythonProcess("wayon_telemetry", "system.wayon_vehicle_telemetry", wayon_remote_ready),
 ]
 
 # StarPilot variables
