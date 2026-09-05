@@ -303,6 +303,19 @@ static bool volkswagen_meb_tx_hook(const CANPacket_t *msg) {
 
   bool tx = true;
 
+  // The radar knockout needs Tester Present on the functional diagnostic address to hold the
+  // programming session. Allow only that exact frame, so this does not become a channel for
+  // arbitrary UDS requests to every ECU on the bus while driving.
+  if (msg->addr == MSG_DIAGNOSTIC) {
+    const bool is_tester_present = (msg->data[0] == 0x02U) && (msg->data[1] == 0x3EU) &&
+                                   (msg->data[2] == 0x80U) && (msg->data[3] == 0x00U) &&
+                                   (msg->data[4] == 0x00U) && (msg->data[5] == 0x00U) &&
+                                   (msg->data[6] == 0x00U) && (msg->data[7] == 0x00U);
+    if (!is_tester_present) {
+      tx = false;
+    }
+  }
+
   // Safety check for MSG_ACC_18 acceleration requests
   if (msg->addr == MSG_ACC_18) {
     // Signal: ACC_18.ACC_Sollbeschleunigung_02 (acceleration in m/s2, scale 0.005, offset -7.22)

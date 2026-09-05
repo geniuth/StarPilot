@@ -397,6 +397,17 @@ class TestVolkswagenMebLongRadarDisableSafety(TestVolkswagenMebLongSafety):
                                  VolkswagenSafetyFlags.LONG_CONTROL | VolkswagenSafetyFlags.MEB_DISABLE_RADAR)
     self.safety.init_tests()
 
+  def test_tester_present_payload_only(self):
+    # Holding the radar's programming session must not become a channel for arbitrary UDS
+    tester_present = bytes([0x02, 0x3E, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00])
+    self.assertTrue(self._tx(common.make_msg(0, MSG_DIAGNOSTIC, dat=tester_present)))
+
+    for bad in (bytes(8),                                              # empty
+                bytes([0x02, 0x3E, 0x00, 0, 0, 0, 0, 0]),              # response not suppressed
+                bytes([0x02, 0x10, 0x02, 0, 0, 0, 0, 0]),              # programming session request
+                bytes([0x03, 0x22, 0xF1, 0x87, 0, 0, 0, 0])):          # read data by identifier
+      self.assertFalse(self._tx(common.make_msg(0, MSG_DIAGNOSTIC, dat=bad)), f"allowed {bad.hex()}")
+
 
 class TestVolkswagenMebStockRadarDisableIgnoredSafety(TestVolkswagenMebStockSafety):
   # The radar replacements are longitudinal-only: without it the flag must change nothing,
