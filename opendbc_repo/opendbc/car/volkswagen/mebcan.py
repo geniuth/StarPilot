@@ -316,17 +316,31 @@ def create_blinker_control(packer, bus, ea_hud_stock_values, ea_control_stock_va
 # reports the system as unavailable, and an empty object list. Stock AEB, FCW and EA are lost.
 
 def create_aeb_control(packer, bus):
-  # Inert AWV_03, constants shared by MEB gen1 and gen2
+  # Inert AWV_03, constants shared by MEB gen1 and gen2.
+  #
+  # carrot's DBC names this frame's fields differently, because the two ports reverse
+  # engineered it separately. Same bits, so the constants are mapped by bit offset:
+  #
+  #   bit|len   carrot                 here
+  #    17|7     SET_ME_126        ->   Unknown_17          = 126
+  #    27|5     SET_ME_30         ->   Unknown_27          = 30
+  #    32|8     Timer_SET_ME_254  ->   SET_ME_254          = 254
+  #    40|8     Speed_SET_ME_254  ->   AEB_TTC_Countdown   = 254
+  #    66|10    Accel_SET_ME_1023 ->   AEB_Target_Decel    = raw 1023, which is 0.0 scaled
+  #    80|8     Timer_2_SET_ME_255 ->  Unknown_80          = 255
+  #    93|7     Timer_3_SET_ME_126 ->  Unknown_93          = 126
+  #   100|4     SET_ME_15         ->   Unknown_100         = 15
+  #   128|4     SET_ME_2          ->   AWV_Init_Status (2 bits wide here, same low bits) = 2
   values = {
-    "SET_ME_126":         126,
-    "SET_ME_30":          30,
-    "Timer_SET_ME_254":   254,
-    "Speed_SET_ME_254":   254,
-    "Accel_SET_ME_1023":  1023,
-    "Timer_2_SET_ME_255": 255,
-    "Timer_3_SET_ME_126": 126,
-    "SET_ME_15":          15,
-    "SET_ME_2":           2,
+    "Unknown_17":        126,
+    "Unknown_27":        30,
+    "SET_ME_254":        254,
+    "AEB_TTC_Countdown": 254,
+    "AEB_Target_Decel":  0.0,
+    "Unknown_80":        255,
+    "Unknown_93":        126,
+    "Unknown_100":       15,
+    "AWV_Init_Status":   2,
   }
   return packer.make_can_msg("AWV_03", bus, values)
 
