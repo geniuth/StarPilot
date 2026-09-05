@@ -1001,7 +1001,8 @@ class SafetyTest(SafetyTestBase):
   SCANNED_ADDRS = [*range(0x800),                      # Entire 11-bit CAN address space
                    *range(0x18DA00F1, 0x18DB00F1, 0x100),   # 29-bit UDS physical addressing
                    *range(0x18DB00F1, 0x18DC00F1, 0x100),   # 29-bit UDS functional addressing
-                   *range(0x3300, 0x3400)]                  # Honda
+                   *range(0x3300, 0x3400),                  # Honda
+                   0x16A954AD]                              # VW MEB AEB HUD (MEB_AWV_01)
   FWD_BLACKLISTED_ADDRS: dict[int, list[int]] = {}  # {bus: [addr]}
   FWD_BUS_LOOKUP: dict[int, int] = {0: 2, 2: 0}
 
