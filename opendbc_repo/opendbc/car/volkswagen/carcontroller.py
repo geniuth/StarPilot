@@ -1,6 +1,6 @@
 import numpy as np
 from opendbc.can import CANPacker
-from opendbc.car import Bus, DT_CTRL, structs
+from opendbc.car import Bus, DT_CTRL, make_tester_present_msg, structs
 from opendbc.car.lateral import apply_driver_steer_torque_limits
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.interfaces import CarControllerBase
@@ -38,6 +38,7 @@ class CarController(CarControllerBase):
     self.gra_acc_counter_last = None
     self.eps_timer_soft_disable_alert = False
     self.hca_frame_timer_running = 0
+    self.radar_disabled_warning_timer = 0
     self.hca_frame_same_torque = 0
 
   def update(self, CC, CS, now_nanos, starpilot_toggles):
@@ -127,17 +128,42 @@ class CarController(CarControllerBase):
 
     if self.CP.flags & VolkswagenFlags.STOCK_EA_PRESENT and CS.ea_hud_stock_values:
       if self.frame % self.CCP.EA_02_STEP == 0:
+        # With the radar knocked out, EA errors permanently; hide it once the AEB-unavailable
+        # warning has had its time on screen. Otherwise only hide it while lateral is active.
+        hide_ea_error = (self.radar_disabled_warning_timer >= 600
+                         if self.CP.flags & VolkswagenFlags.DISABLE_RADAR else CC.latActive)
         # Don't relay a blinker the car is already flashing on its own
         blinker_active = CS.left_blinker_active or CS.right_blinker_active
         left_blinker = CC.leftBlinker and not blinker_active
         right_blinker = CC.rightBlinker and not blinker_active
         can_sends.append(mebcan.create_blinker_control(self.packer_pt, self.CAN.pt, CS.ea_hud_stock_values,
                                                        CS.ea_control_stock_values, left_blinker, right_blinker,
-                                                       CC.latActive))
+                                                       hide_ea_error))
+
+    # **** Radar replacement (camera-harness longitudinal) ****************** #
+    # The stock radar is held in a programming session by CarInterface.init(), so it has
+    # stopped transmitting. Keep the session alive and stand in for the messages the rest
+    # of the car still expects. Stock AEB, FCW and EA are inactive while this runs.
+    if (self.CP.flags & VolkswagenFlags.DISABLE_RADAR and self.CP.openpilotLongitudinalControl
+        and not CS.out.radarDisableFailed):
+      # Show the AEB-unavailable HUD for a few seconds before suppressing the EA error
+      if self.radar_disabled_warning_timer < 600:
+        self.radar_disabled_warning_timer += 1
+
+      if self.frame % self.CCP.AEB_CONTROL_STEP == 0:
+        can_sends.append(make_tester_present_msg(0x700, self.CAN.pt, suppress_response=True))
+        can_sends.append(mebcan.create_aeb_control(self.packer_pt, self.CAN.pt))
+
+      if self.frame % self.CCP.AEB_HUD_STEP == 0:
+        can_sends.append(mebcan.create_aeb_hud(self.packer_pt, self.CAN.pt,
+                                               self.radar_disabled_warning_timer < 600))
+
+      if self.frame % self.CCP.RADAR_OBJECT_STEP == 0:
+        can_sends.append(mebcan.create_radar_objects(self.packer_pt, self.CAN.pt))
 
     # **** Acceleration Controls ******************************************** #
 
-    if self.CP.openpilotLongitudinalControl:
+    if self.CP.openpilotLongitudinalControl and not CS.out.radarDisableFailed:
       if self.frame % self.CCP.ACC_CONTROL_STEP == 0:
         if self.CP.flags & VolkswagenFlags.MEB:
           accel = float(np.clip(actuators.accel, self.CCP.ACCEL_MIN, self.CCP.ACCEL_MAX))

@@ -13,6 +13,10 @@
 #define MSG_KLR_01           0x25DU   // TX, for capacitive steering wheel
 #define MSG_TA_01            0x26BU   // TX by OP, Travel Assist status
 #define MSG_EA_02            0x1F0U   // TX by OP, Emergency Assist HUD relay
+#define MSG_AWV_03           0x0DBU   // TX by OP (radar disabled), AEB command replacement
+#define MSG_MEB_AWV_01       0x16A954ADU // TX by OP (radar disabled), AEB HUD replacement (extended ID)
+#define MSG_MEB_DISTANCE_01  0x24FU   // TX by OP (radar disabled), radar object list replacement
+#define MSG_DIAGNOSTIC       0x700U   // TX by OP (radar disabled), Tester Present to hold the session
 
 static bool volkswagen_meb_alt_crc = false;
 
@@ -96,46 +100,64 @@ static uint32_t volkswagen_meb_alt_crc_compute(const CANPacket_t *msg) {
   return ret;
 }
 
+// Shared TX message sets. EA_02 and the radar replacements are only permitted when the car
+// port says the car has them, so a car without an EA module keeps its stock HUD forwarded and
+// a gateway-harness car never sees the radar replacements.
+#define VOLKSWAGEN_MEB_STOCK_TX_BASE \
+  {MSG_HCA_03, 0, 24, .check_relay = true}, \
+  {MSG_GRA_ACC_01, 0, 8, .check_relay = false}, \
+  {MSG_GRA_ACC_01, 2, 8, .check_relay = false}, \
+  {MSG_LDW_02, 0, 8, .check_relay = true}, \
+  {MSG_KLR_01, 0, 8, .check_relay = false}, \
+  {MSG_KLR_01, 2, 8, .check_relay = true},
+
+#define VOLKSWAGEN_MEB_LONG_TX_BASE \
+  {MSG_HCA_03, 0, 24, .check_relay = true}, \
+  {MSG_LDW_02, 0, 8, .check_relay = true}, \
+  {MSG_KLR_01, 0, 8, .check_relay = false}, \
+  {MSG_KLR_01, 2, 8, .check_relay = true}, \
+  {MSG_ACC_19, 0, 48, .check_relay = true}, \
+  {MSG_ACC_18, 0, 32, .check_relay = true}, \
+  {MSG_TA_01, 0, 8, .check_relay = true},
+
+#define VOLKSWAGEN_MEB_EA_TX \
+  {MSG_EA_02, 0, 8, .check_relay = true},
+
+#define VOLKSWAGEN_MEB_RADAR_TX \
+  {MSG_AWV_03, 0, 48, .check_relay = true}, \
+  {MSG_MEB_AWV_01, 0, 8, .check_relay = true}, \
+  {MSG_MEB_DISTANCE_01, 0, 64, .check_relay = true}, \
+  {MSG_DIAGNOSTIC, 0, 8, .check_relay = false},
+
 static safety_config volkswagen_meb_init(uint16_t param) {
   // Transmit of GRA_ACC_01 is allowed on bus 0 and 2 to keep compatibility with gateway and camera integration
   static const CanMsg VOLKSWAGEN_MEB_STOCK_TX_MSGS[] = {
-    {MSG_HCA_03, 0, 24, .check_relay = true},
-    {MSG_GRA_ACC_01, 0, 8, .check_relay = false},
-    {MSG_GRA_ACC_01, 2, 8, .check_relay = false},
-    {MSG_LDW_02, 0, 8, .check_relay = true},
-    {MSG_KLR_01, 0, 8, .check_relay = false},
-    {MSG_KLR_01, 2, 8, .check_relay = true},
+    VOLKSWAGEN_MEB_STOCK_TX_BASE
   };
 
   static const CanMsg VOLKSWAGEN_MEB_STOCK_EA_TX_MSGS[] = {
-    {MSG_HCA_03, 0, 24, .check_relay = true},
-    {MSG_GRA_ACC_01, 0, 8, .check_relay = false},
-    {MSG_GRA_ACC_01, 2, 8, .check_relay = false},
-    {MSG_LDW_02, 0, 8, .check_relay = true},
-    {MSG_KLR_01, 0, 8, .check_relay = false},
-    {MSG_KLR_01, 2, 8, .check_relay = true},
-    {MSG_EA_02, 0, 8, .check_relay = true},
+    VOLKSWAGEN_MEB_STOCK_TX_BASE
+    VOLKSWAGEN_MEB_EA_TX
   };
 
   static const CanMsg VOLKSWAGEN_MEB_LONG_TX_MSGS[] = {
-    {MSG_HCA_03, 0, 24, .check_relay = true},
-    {MSG_LDW_02, 0, 8, .check_relay = true},
-    {MSG_KLR_01, 0, 8, .check_relay = false},
-    {MSG_KLR_01, 2, 8, .check_relay = true},
-    {MSG_ACC_19, 0, 48, .check_relay = true},
-    {MSG_ACC_18, 0, 32, .check_relay = true},
-    {MSG_TA_01, 0, 8, .check_relay = true},
+    VOLKSWAGEN_MEB_LONG_TX_BASE
   };
 
   static const CanMsg VOLKSWAGEN_MEB_LONG_EA_TX_MSGS[] = {
-    {MSG_HCA_03, 0, 24, .check_relay = true},
-    {MSG_LDW_02, 0, 8, .check_relay = true},
-    {MSG_KLR_01, 0, 8, .check_relay = false},
-    {MSG_KLR_01, 2, 8, .check_relay = true},
-    {MSG_ACC_19, 0, 48, .check_relay = true},
-    {MSG_ACC_18, 0, 32, .check_relay = true},
-    {MSG_TA_01, 0, 8, .check_relay = true},
-    {MSG_EA_02, 0, 8, .check_relay = true},
+    VOLKSWAGEN_MEB_LONG_TX_BASE
+    VOLKSWAGEN_MEB_EA_TX
+  };
+
+  static const CanMsg VOLKSWAGEN_MEB_LONG_RADAR_TX_MSGS[] = {
+    VOLKSWAGEN_MEB_LONG_TX_BASE
+    VOLKSWAGEN_MEB_RADAR_TX
+  };
+
+  static const CanMsg VOLKSWAGEN_MEB_LONG_EA_RADAR_TX_MSGS[] = {
+    VOLKSWAGEN_MEB_LONG_TX_BASE
+    VOLKSWAGEN_MEB_EA_TX
+    VOLKSWAGEN_MEB_RADAR_TX
   };
 
   static RxCheck volkswagen_meb_rx_checks[] = {
@@ -153,43 +175,49 @@ static safety_config volkswagen_meb_init(uint16_t param) {
   volkswagen_common_init();
   const uint16_t FLAG_VOLKSWAGEN_MEB_ALT_CRC = 2;
   const uint16_t FLAG_VOLKSWAGEN_MEB_EA_RELAY = 4;
+  const uint16_t FLAG_VOLKSWAGEN_MEB_DISABLE_RADAR = 8;
   volkswagen_meb_alt_crc = GET_FLAG(param, FLAG_VOLKSWAGEN_MEB_ALT_CRC);
   const bool volkswagen_meb_ea_relay = GET_FLAG(param, FLAG_VOLKSWAGEN_MEB_EA_RELAY);
+  bool volkswagen_meb_disable_radar = GET_FLAG(param, FLAG_VOLKSWAGEN_MEB_DISABLE_RADAR);
 
 #ifdef ALLOW_DEBUG
   volkswagen_longitudinal = GET_FLAG(param, FLAG_VOLKSWAGEN_LONG_CONTROL);
 #endif
 
-  safety_config ret;
-  if (volkswagen_longitudinal) {
-    if (volkswagen_meb_alt_crc) {
-      if (volkswagen_meb_ea_relay) {
-        ret = BUILD_SAFETY_CFG(volkswagen_meb_gen2_rx_checks, VOLKSWAGEN_MEB_LONG_EA_TX_MSGS);
-      } else {
-        ret = BUILD_SAFETY_CFG(volkswagen_meb_gen2_rx_checks, VOLKSWAGEN_MEB_LONG_TX_MSGS);
-      }
-    } else {
-      if (volkswagen_meb_ea_relay) {
-        ret = BUILD_SAFETY_CFG(volkswagen_meb_rx_checks, VOLKSWAGEN_MEB_LONG_EA_TX_MSGS);
-      } else {
-        ret = BUILD_SAFETY_CFG(volkswagen_meb_rx_checks, VOLKSWAGEN_MEB_LONG_TX_MSGS);
-      }
-    }
-  } else {
-    if (volkswagen_meb_alt_crc) {
-      if (volkswagen_meb_ea_relay) {
-        ret = BUILD_SAFETY_CFG(volkswagen_meb_gen2_rx_checks, VOLKSWAGEN_MEB_STOCK_EA_TX_MSGS);
-      } else {
-        ret = BUILD_SAFETY_CFG(volkswagen_meb_gen2_rx_checks, VOLKSWAGEN_MEB_STOCK_TX_MSGS);
-      }
-    } else {
-      if (volkswagen_meb_ea_relay) {
-        ret = BUILD_SAFETY_CFG(volkswagen_meb_rx_checks, VOLKSWAGEN_MEB_STOCK_EA_TX_MSGS);
-      } else {
-        ret = BUILD_SAFETY_CFG(volkswagen_meb_rx_checks, VOLKSWAGEN_MEB_STOCK_TX_MSGS);
-      }
-    }
+  // The radar replacements only exist to keep openpilot longitudinal alive on a camera
+  // harness; without longitudinal there is nothing for them to stand in for.
+  if (!volkswagen_longitudinal) {
+    volkswagen_meb_disable_radar = false;
   }
+
+  RxCheck *rx_checks = volkswagen_meb_alt_crc ? volkswagen_meb_gen2_rx_checks : volkswagen_meb_rx_checks;
+  const int rx_checks_len = volkswagen_meb_alt_crc ?
+    (int)(sizeof(volkswagen_meb_gen2_rx_checks) / sizeof(volkswagen_meb_gen2_rx_checks[0])) :
+    (int)(sizeof(volkswagen_meb_rx_checks) / sizeof(volkswagen_meb_rx_checks[0]));
+
+  const CanMsg *tx_msgs;
+  int tx_msgs_len;
+  if (volkswagen_longitudinal && volkswagen_meb_disable_radar && volkswagen_meb_ea_relay) {
+    tx_msgs = VOLKSWAGEN_MEB_LONG_EA_RADAR_TX_MSGS;
+    tx_msgs_len = (int)(sizeof(VOLKSWAGEN_MEB_LONG_EA_RADAR_TX_MSGS) / sizeof(CanMsg));
+  } else if (volkswagen_longitudinal && volkswagen_meb_disable_radar) {
+    tx_msgs = VOLKSWAGEN_MEB_LONG_RADAR_TX_MSGS;
+    tx_msgs_len = (int)(sizeof(VOLKSWAGEN_MEB_LONG_RADAR_TX_MSGS) / sizeof(CanMsg));
+  } else if (volkswagen_longitudinal && volkswagen_meb_ea_relay) {
+    tx_msgs = VOLKSWAGEN_MEB_LONG_EA_TX_MSGS;
+    tx_msgs_len = (int)(sizeof(VOLKSWAGEN_MEB_LONG_EA_TX_MSGS) / sizeof(CanMsg));
+  } else if (volkswagen_longitudinal) {
+    tx_msgs = VOLKSWAGEN_MEB_LONG_TX_MSGS;
+    tx_msgs_len = (int)(sizeof(VOLKSWAGEN_MEB_LONG_TX_MSGS) / sizeof(CanMsg));
+  } else if (volkswagen_meb_ea_relay) {
+    tx_msgs = VOLKSWAGEN_MEB_STOCK_EA_TX_MSGS;
+    tx_msgs_len = (int)(sizeof(VOLKSWAGEN_MEB_STOCK_EA_TX_MSGS) / sizeof(CanMsg));
+  } else {
+    tx_msgs = VOLKSWAGEN_MEB_STOCK_TX_MSGS;
+    tx_msgs_len = (int)(sizeof(VOLKSWAGEN_MEB_STOCK_TX_MSGS) / sizeof(CanMsg));
+  }
+
+  safety_config ret = {rx_checks, rx_checks_len, tx_msgs, tx_msgs_len, false};
   return ret;
 }
 

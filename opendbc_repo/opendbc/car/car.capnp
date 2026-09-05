@@ -205,6 +205,9 @@ struct CarState {
   vehicleSensorsInvalid @52 :Bool;  # invalid steering angle readings, etc.
   lowSpeedAlert @56 :Bool;  # lost steering control due to a dynamic min steering speed
   blockPcmEnable @60 :Bool;  # whether to allow PCM to enable this frame
+  # VW MEB DISABLE_RADAR: knocking the stock radar out at init failed, so openpilot must
+  # not transmit its ACC commands - the live radar is still driving the car
+  radarDisableFailed @61 :Bool;
 
   # cruise state
   cruiseState @10 :CruiseState;

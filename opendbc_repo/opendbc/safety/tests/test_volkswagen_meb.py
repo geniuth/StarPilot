@@ -19,6 +19,10 @@ MSG_QFK_01     = 0x13D
 MSG_ACC_18     = 0x14D
 MSG_KLR_01     = 0x25D
 MSG_EA_02      = 0x1F0
+MSG_AWV_03     = 0x0DB
+MSG_MEB_AWV_01 = 0x16A954AD
+MSG_MEB_DIST   = 0x24F
+MSG_DIAGNOSTIC = 0x700
 MSG_TA_01      = 0x26B
 MSG_ACC_19     = 0x300
 MSG_HCA_03     = 0x303
@@ -371,4 +375,35 @@ class TestVolkswagenMebLongEaRelaySafety(TestVolkswagenMebLongSafety):
     self.safety = libsafety_py.libsafety
     self.safety.set_safety_hooks(CarParams.SafetyModel.volkswagenMeb,
                                  VolkswagenSafetyFlags.LONG_CONTROL | VolkswagenSafetyFlags.MEB_EA_RELAY)
+    self.safety.init_tests()
+
+
+class TestVolkswagenMebLongRadarDisableSafety(TestVolkswagenMebLongSafety):
+  # Camera-harness longitudinal: openpilot replaces the knocked-out radar's messages
+  TX_MSGS = [[MSG_HCA_03, 0], [MSG_LDW_02, 0], [MSG_ACC_19, 0], [MSG_ACC_18, 0],
+             [MSG_TA_01, 0], [MSG_KLR_01, 0], [MSG_KLR_01, 2],
+             [MSG_AWV_03, 0], [MSG_MEB_AWV_01, 0], [MSG_MEB_DIST, 0], [MSG_DIAGNOSTIC, 0]]
+  FWD_BLACKLISTED_ADDRS = {0: [MSG_KLR_01],
+                           2: [MSG_HCA_03, MSG_LDW_02, MSG_ACC_19, MSG_ACC_18, MSG_TA_01,
+                               MSG_AWV_03, MSG_MEB_AWV_01, MSG_MEB_DIST]}
+  RELAY_MALFUNCTION_ADDRS = {0: (MSG_HCA_03, MSG_LDW_02, MSG_ACC_19, MSG_ACC_18, MSG_TA_01,
+                                 MSG_AWV_03, MSG_MEB_AWV_01, MSG_MEB_DIST),
+                             2: (MSG_KLR_01,)}
+
+  def setUp(self):
+    self.packer = CANPackerSafety("vw_meb_generated")
+    self.safety = libsafety_py.libsafety
+    self.safety.set_safety_hooks(CarParams.SafetyModel.volkswagenMeb,
+                                 VolkswagenSafetyFlags.LONG_CONTROL | VolkswagenSafetyFlags.MEB_DISABLE_RADAR)
+    self.safety.init_tests()
+
+
+class TestVolkswagenMebStockRadarDisableIgnoredSafety(TestVolkswagenMebStockSafety):
+  # The radar replacements are longitudinal-only: without it the flag must change nothing,
+  # or a stock-ACC car would be allowed to transmit over its own live radar.
+  def setUp(self):
+    self.packer = CANPackerSafety("vw_meb_generated")
+    self.safety = libsafety_py.libsafety
+    self.safety.set_safety_hooks(CarParams.SafetyModel.volkswagenMeb,
+                                 VolkswagenSafetyFlags.MEB_DISABLE_RADAR)
     self.safety.init_tests()

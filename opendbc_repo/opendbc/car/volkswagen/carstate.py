@@ -3,7 +3,7 @@ from opendbc.can import CANParser
 from opendbc.car import Bus, structs
 from opendbc.car.interfaces import CarStateBase
 from opendbc.car.common.conversions import Conversions as CV
-from opendbc.car.volkswagen.values import DBC, CanBus, NetworkLocation, TransmissionType, GearShifter, \
+from opendbc.car.volkswagen.values import RADAR_DISABLE_STATE, DBC, CanBus, NetworkLocation, TransmissionType, GearShifter, \
                                                       CarControllerParams, VolkswagenFlags
 
 ButtonType = structs.CarState.ButtonEvent.Type
@@ -239,6 +239,10 @@ class CarState(CarStateBase):
     if self.CP.flags & VolkswagenFlags.STOCK_EA_PRESENT:
       self.ea_hud_stock_values = cam_cp.vl["EA_02"]
       self.ea_control_stock_values = cam_cp.vl["EA_01"]
+
+    # A failed radar knockout means the stock radar is still live and openpilot must not
+    # transmit ACC alongside it; carcontroller reads this and stands down.
+    ret.radarDisableFailed = RADAR_DISABLE_STATE["error"] and bool(self.CP.flags & VolkswagenFlags.DISABLE_RADAR)
 
     ret.buttonEvents = self.create_button_events(pt_cp, self.CCP.BUTTONS)
     ret.lowSpeedAlert = self.update_low_speed_alert(ret.vEgo)

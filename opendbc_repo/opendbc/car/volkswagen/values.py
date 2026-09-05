@@ -107,6 +107,9 @@ class CarControllerParams:
       self.ACC_HUD_STEP = 6
       self.KLR_01_STEP = 6                # KLR_01 message frequency 17Hz
       self.EA_02_STEP = 2                 # EA_02 relay frequency 50Hz (stock is 10Hz; matches carrot)
+      self.AEB_CONTROL_STEP = 100         # AWV_03 replacement frequency 1Hz
+      self.AEB_HUD_STEP = 20              # MEB_AWV_01 replacement frequency 5Hz
+      self.RADAR_OBJECT_STEP = 4          # MEB_Distance_01 replacement frequency 25Hz
       self.STEER_DRIVER_ALLOWANCE = 100   # Begin reducing steering power at 1.0 Nm driver torque
       self.STEER_DRIVER_MAX = 300         # Reach minimum steering power at 3.0 Nm driver torque
       self.STEERING_POWER_MAX = 50
@@ -217,6 +220,7 @@ class VolkswagenSafetyFlags(IntFlag):
   LONG_CONTROL = 1
   MEB_ALT_CRC = 2
   MEB_EA_RELAY = 4
+  MEB_DISABLE_RADAR = 8
 
 
 class VolkswagenFlags(IntFlag):
@@ -227,11 +231,20 @@ class VolkswagenFlags(IntFlag):
   STOCK_KLR_PRESENT = 64
   STOCK_EA_PRESENT = 16384  # Emergency Assist module present (EA_01/EA_02) -> relay its HUD
 
+  # Camera-harness longitudinal: trap the stock radar in a programming session and let
+  # openpilot stand in for its AEB and object messages. Opt-in via the MebDisableRadar param.
+  DISABLE_RADAR = 512
+
   # Static flags
   PQ = 2
   MLB = 8
   MEB = 16
   MEB_GEN2 = 128
+
+
+# The radar knockout runs once in CarInterface.init(); carstate reads the outcome from here
+# so a failed knockout can be surfaced to the driver and stop openpilot transmitting ACC.
+RADAR_DISABLE_STATE: dict[str, bool] = {"error": False}
 
 
 @dataclass

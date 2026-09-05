@@ -308,3 +308,40 @@ def create_blinker_control(packer, bus, ea_hud_stock_values, ea_control_stock_va
       values["EA_Unknown"] = 1
 
   return packer.make_can_msg("EA_02", bus, values)
+
+
+# **** Radar replacement, for camera-harness longitudinal (VolkswagenFlags.DISABLE_RADAR) *** #
+# With the stock radar trapped in a programming session it stops transmitting, and the ECUs
+# that depended on it fault. openpilot stands in with an inert AEB command, an AEB HUD that
+# reports the system as unavailable, and an empty object list. Stock AEB, FCW and EA are lost.
+
+def create_aeb_control(packer, bus):
+  # Inert AWV_03, constants shared by MEB gen1 and gen2
+  values = {
+    "SET_ME_126":         126,
+    "SET_ME_30":          30,
+    "Timer_SET_ME_254":   254,
+    "Speed_SET_ME_254":   254,
+    "Accel_SET_ME_1023":  1023,
+    "Timer_2_SET_ME_255": 255,
+    "Timer_3_SET_ME_126": 126,
+    "SET_ME_15":          15,
+    "SET_ME_2":           2,
+  }
+  return packer.make_can_msg("AWV_03", bus, values)
+
+
+def create_aeb_hud(packer, bus, disabled):
+  values = {
+    "AWV_Enabled": not disabled,
+    "AWV_Init":    1,            # uninitialised, so the cluster shows the white icon
+    "SET_ME_1":    1,
+    "SET_ME_511":  511,
+  }
+  return packer.make_can_msg("MEB_AWV_01", bus, values)
+
+
+def create_radar_objects(packer, bus):
+  # Empty stand-in for the radar's object list. carrot calls this message Strukturen_01;
+  # it is the same 0x24F/64-byte frame this port's DBC names MEB_Distance_01.
+  return packer.make_can_msg("MEB_Distance_01", bus, {})
