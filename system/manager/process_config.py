@@ -86,6 +86,11 @@ def wayon_remote_ready(started: bool, params: Params, CP: car.CarParams, starpil
 def wayon_live_streaming(started: bool, params: Params, CP: car.CarParams, starpilot_toggles: SimpleNamespace) -> bool:
   return os.path.isfile(WAYON_LIVE_ACTIVE_PATH)
 
+# Carrot Navi receiver: listens on 7713/7714 for a navi app. Cheap when nothing connects,
+# so it is gated on the feature being switched on rather than on a connection existing.
+def carrot_navi_enabled(started: bool, params: Params, CP: car.CarParams, starpilot_toggles: SimpleNamespace) -> bool:
+  return params.get_int("AutoNaviSpeedCtrlMode") > 0
+
 def or_(*fns):
   return lambda *args: operator.or_(*(fn(*args) for fn in fns))
 
@@ -182,6 +187,8 @@ procs = [
   PythonProcess("webrtcd", "system.webrtc.webrtcd", or_(and_(livestream, not_(iscar)), notcar)),
   PythonProcess("webjoystick", "tools.bodyteleop.web", notcar),
   PythonProcess("joystick", "tools.joystick.joystick_control", and_(joystick, iscar)),
+
+  PythonProcess("carrot_navi", "starpilot.navigation.carrot_navi.receiver", carrot_navi_enabled),
 
   # Wayon remote (all gated on /data/wayon_cloud/config.json existing)
   PythonProcess("wayon_live", "system.wayon_live_stream", wayon_remote_ready),

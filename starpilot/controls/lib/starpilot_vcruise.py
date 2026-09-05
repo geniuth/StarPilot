@@ -8,6 +8,8 @@ from openpilot.common.realtime import DT_MDL
 from openpilot.starpilot.common.starpilot_variables import CITY_SPEED_LIMIT, CRUISING_SPEED
 from openpilot.starpilot.controls.lib.curve_speed_controller import CurveSpeedController, is_manual_speed_control
 from openpilot.starpilot.controls.lib.speed_limit_controller import SpeedLimitController
+from openpilot.starpilot.navigation.carrot_navi.control import get_carrot_navi_target
+from openpilot.starpilot.navigation.carrot_navi.speed import NaviSpeedConfig
 from openpilot.selfdrive.controls.lib.longitudinal_vehicle_tunes import (
   get_force_stop_distance_bias,
   get_force_stop_handoff_distance,
@@ -159,6 +161,16 @@ class StarPilotVCruise:
 
     self.csc = CurveSpeedController(self)
     self.slc = SpeedLimitController(self)
+
+    # Carrot Navi deceleration. The config is read once here rather than per frame; the
+    # receiver process re-reads the same params periodically for its own use.
+    try:
+      from openpilot.common.params import Params
+      self.carrot_navi_config = NaviSpeedConfig.from_params(Params())
+    except Exception:
+      self.carrot_navi_config = NaviSpeedConfig()
+    self.carrot_navi_target = 0.0
+    self.carrot_navi_source = "none"
 
     self.forcing_stop = False
     self.override_force_stop = False
@@ -679,6 +691,13 @@ class StarPilotVCruise:
         targets.append(slc_control_target)
       if self.nav_turn_target > 0.0:
         targets.append(self.nav_turn_target)
+
+      # Carrot Navi: speed cameras, section enforcement, bumps, turn manoeuvres and route
+      # curvature. Quiet unless a navi app is actually feeding the receiver.
+      self.carrot_navi_target, self.carrot_navi_source = get_carrot_navi_target(
+        sm, self.carrot_navi_config)
+      if self.carrot_navi_target > 0.0:
+        targets.append(self.carrot_navi_target)
 
       # Far-approach envelope: bleed speed off before commit so the car isn't still at
       # cruise when the kinematic curve takes over. Same vetoes as the activation paths;

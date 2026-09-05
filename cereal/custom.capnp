@@ -305,7 +305,56 @@ struct StarPilotLateralState @0xc2243c65e0340384 {
   unwindDetected @7 :Bool;
 }
 
-struct CustomReserved12 @0x9ccdc8676701b412 {
+# Carrot Navi state, published by the receiver process from either the 7713 legacy HTTP
+# feed or the 7714 Carrot Navi v2 stream. Field names follow carrot's own so the mapping
+# back to that port stays auditable.
+struct CarrotNaviState @0x9ccdc8676701b412 {
+  # liveness
+  active @0 :UInt8;            # carrot's active_carrot: 0 none, 2 route, 3 camera, 4 section, 5 bump
+  connected @1 :Bool;
+  source @2 :Text;             # "7713" or "7714"
+  sessionId @3 :Text;
+  offRoute @4 :Bool;
+
+  # road
+  roadLimitSpeed @5 :Float32;  # kph, 0 when unknown
+  roadCategory @6 :Int16;      # carrot's roadcate; 0,1 are motorway classes
+  roadName @7 :Text;
+
+  # safe driving information (speed cameras, section enforcement, bumps)
+  sdiType @8 :Int16;
+  sdiSpeedLimit @9 :Float32;
+  sdiDistance @10 :Float32;
+  sdiBlockType @11 :Int16;
+  sdiBlockSpeed @12 :Float32;
+  sdiBlockDistance @13 :Float32;
+  sdiPlusType @14 :Int16;
+  sdiPlusSpeedLimit @15 :Float32;
+  sdiPlusDistance @16 :Float32;
+
+  # turn by turn
+  tbtTurnType @17 :Int16;
+  tbtDistance @18 :Float32;
+  tbtTurnTypeNext @19 :Int16;
+  tbtDistanceNext @20 :Float32;
+  tbtNextRoadWidth @21 :Float32;
+
+  # position, for indexing into the route
+  latitude @22 :Float64;
+  longitude @23 :Float64;
+  bearing @24 :Float32;
+
+  # route polyline, longitude/latitude pairs flattened
+  routePoints @25 :List(Float64);
+  routeSequence @26 :Int32;
+
+  # remaining distance and time to destination
+  goPosDistance @27 :Float32;
+  goPosTime @28 :Float32;
+
+  # Curvature speed from the route polyline, km/h. Computed in the receiver so the
+  # 300 m path search and resample happen at 10 Hz rather than in the planner loop.
+  routeCurveSpeed @29 :Float32;
 }
 
 struct CustomReserved13 @0xcd96dafb67a082d0 {

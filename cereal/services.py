@@ -121,6 +121,7 @@ _services: dict[str, tuple] = {
   "mapdExtendedOut": (True, 1., 1, QueueSize.MEDIUM),
   "mapdIn": (True, 1., 1, QueueSize.MEDIUM),
   "mapdOut": (True, 20., 20, QueueSize.MEDIUM),
+  "carrotNaviState": (True, 10., 5, QueueSize.MEDIUM),
 }
 SERVICE_LIST = {name: Service(*vals) for
                 idx, (name, vals) in enumerate(_services.items())}

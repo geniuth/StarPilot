@@ -609,6 +609,20 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"SLCAdoptSpeedLimit", {CLEAR_ON_MANAGER_START, BOOL, "0", "0"}},
     {"SLCForceCruiseSpeed", {CLEAR_ON_MANAGER_START, FLOAT, "0.0", "0.0"}},
     {"SpeedLimitAccepted", {CLEAR_ON_MANAGER_START, BOOL, "0", "0"}},
+
+    // Carrot Navi deceleration (speed cameras, section enforcement, bumps, route)
+    {"AutoNaviSpeedCtrlMode", {PERSISTENT, INT, "2", "2", 0}},  // 0 off, 1 cameras, 2 +bumps, 3 +mobile cameras
+    {"AutoNaviSpeedCtrlEnd", {PERSISTENT, INT, "10", "10", 0}},  // s, be at the limit this early
+    {"AutoNaviSpeedSafetyFactor", {PERSISTENT, INT, "100", "100", 0}},  // percent of the posted limit
+    {"AutoNaviSpeedDecelRate", {PERSISTENT, INT, "80", "80", 0}},  // m/s^2 x100
+    {"AutoNaviSpeedBumpSpeed", {PERSISTENT, INT, "25", "25", 0}},  // kph over a speed bump
+    {"AutoNaviSpeedBumpTime", {PERSISTENT, INT, "1", "1", 0}},  // s, the bump equivalent of CtrlEnd
+    {"AutoTurnControl", {PERSISTENT, INT, "0", "0", 0}},  // 0 off, 1 steer, 2 steer+speed, 3 speed
+    {"TurnSpeedControlMode", {PERSISTENT, INT, "0", "0", 0}},  // route curvature mode, 0 off
+    {"AutoTurnControlSpeedTurn", {PERSISTENT, INT, "20", "20", 0}},  // kph through a turn manoeuvre
+    {"AutoTurnControlTurnEnd", {PERSISTENT, INT, "6", "6", 0}},  // s ahead of the turn to be slowed
+    {"AutoCurveSpeedLowerLimit", {PERSISTENT, INT, "30", "30", 0}},  // kph floor for curvature targets
+    {"MapTurnSpeedFactor", {PERSISTENT, INT, "100", "100", 0}},  // percent applied to route curvature speed
     {"SpeedLimitChangedAlert", {PERSISTENT, BOOL, "0", "0", 0, SETTINGS_SIMPLE}},
     {"SpeedLimitController", {PERSISTENT, BOOL, "0", "0", 0}},
     {"SpeedLimitFiller", {PERSISTENT, BOOL, "0", "0", 0}},
