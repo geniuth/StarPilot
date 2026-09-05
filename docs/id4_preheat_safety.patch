@@ -1,0 +1,58 @@
+# ID.4 예열용 safety 패치 (재생 검증 성공 후에만 적용)
+#
+# Blinkmodi_02(0x366)를 판다 TX 화이트리스트에 추가한다. 이게 있어야
+# wayon_preheat.py 가 sendcan 으로 보낸 언락 프레임이 pandad safety 를
+# 통과해 실제 버스로 나간다. 세 배열(STOCK/LONG/RADAR_DISABLE)에 모두 넣어
+# 어느 모드에서든 예열이 되게 한다.
+#
+# ⚠️ 이 파일은 patch 로만 둔다. safety_volkswagen_meb.h 를 직접 커밋하면
+#    기기가 브랜치를 받을 때 openpilot 이 판다 펌웨어 불일치를 감지해 자동
+#    재플래시할 수 있다. 재생 검증(1-b) 전에는 그걸 원치 않는다.
+#
+# === 적용 방법 (검증 성공 후, 기기에서) ===
+#   cd /data/openpilot
+#   git apply docs/id4_preheat_safety.patch
+#   # 판다 재빌드/플래시는 openpilot 재시작 시 자동 (펌웨어 해시 변경 감지)
+#   sudo systemctl restart comma
+#   # config.json 에 "preheat_enabled": true 도 넣어야 wayon_preheat 가 실제 송신함
+#
+# === 되돌리기 ===
+#   git checkout -- opendbc_repo/opendbc/safety/safety/safety_volkswagen_meb.h
+#   sudo systemctl restart comma
+
+diff --git a/opendbc_repo/opendbc/safety/safety/safety_volkswagen_meb.h b/opendbc_repo/opendbc/safety/safety/safety_volkswagen_meb.h
+index b5d4445ae..4e811dc99 100644
+--- a/opendbc_repo/opendbc/safety/safety/safety_volkswagen_meb.h
++++ b/opendbc_repo/opendbc/safety/safety/safety_volkswagen_meb.h
+@@ -17,6 +17,7 @@
+ #define MSG_MEB_AWV_01       0x16A954ADU // TX by OP (DISABLE_RADAR), radar AEB HUD replacement (ext ID, 8B)
+ #define MSG_STRUKTUREN_01    0x24F       // TX by OP (DISABLE_RADAR), empty radar objects replacement (64B)
+ #define MSG_DIAGNOSTIC       0x700       // TX by OP (DISABLE_RADAR), Tester Present to keep radar programming session
++#define MSG_BLINKMODI_02     0x366       // TX by OP (ID.4 preheat), unlock replay (BM_ZV_auf) on bus1, 8B
+ 
+ // Note: MSG_LH_EPS_03 (0x09F), MSG_GRA_ACC_01 (0x12B), MSG_MOTOR_14 (0x3BE),
+ //       MSG_LDW_02 (0x397) are shared with MQB (defined in safety_volkswagen_common.h)
+@@ -44,6 +45,7 @@ static safety_config volkswagen_meb_init(uint16_t param) {
+     {MSG_KLR_01, 0, 8},       // Capacitive steering wheel touch (EA hands-on)
+     {MSG_KLR_01, 2, 8},
+     {MSG_EA_02, 0, 8},        // Emergency Assist HUD relay (steering-wheel icon)
++    {MSG_BLINKMODI_02, 1, 8}, // ID.4 preheat: unlock replay on comfort-side bus (offroad only, app-gated)
+   };
+ 
+   // openpilot longitudinal: openpilot replaces stock ACC accel command (ACC_18) and HUD (ACC_19/MEB_ACC_01),
+@@ -60,6 +62,7 @@ static safety_config volkswagen_meb_init(uint16_t param) {
+     {MSG_KLR_01, 0, 8},       // Capacitive steering wheel touch (EA hands-on)
+     {MSG_KLR_01, 2, 8},
+     {MSG_EA_02, 0, 8},        // Emergency Assist HUD relay (steering-wheel icon)
++    {MSG_BLINKMODI_02, 1, 8}, // ID.4 preheat: unlock replay on comfort-side bus (offroad only, app-gated)
+   };
+ 
+   // DISABLE_RADAR(카메라 하네스 롱컨): 롱컨 tx + 레이더 대체 메시지 4종.
+@@ -76,6 +79,7 @@ static safety_config volkswagen_meb_init(uint16_t param) {
+     {MSG_KLR_01, 0, 8},
+     {MSG_KLR_01, 2, 8},
+     {MSG_EA_02, 0, 8},
++    {MSG_BLINKMODI_02, 1, 8},     // ID.4 preheat: unlock replay on comfort-side bus (offroad only, app-gated)
+     {MSG_AWV_03, 0, 48},          // AEB control replacement
+     {MSG_MEB_AWV_01, 0, 8},       // AEB HUD replacement (extended ID)
+     {MSG_STRUKTUREN_01, 0, 64},   // empty radar objects replacement
