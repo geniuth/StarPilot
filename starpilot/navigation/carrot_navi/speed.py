@@ -72,11 +72,20 @@ class NaviSpeedConfig:
   @classmethod
   def from_params(cls, params):
     def num(key, default, scale=1.0):
+      # Read through get() rather than get_int(), which reports an unset key as 0. That
+      # would silently disable the feature instead of falling back to the default here.
       try:
-        v = params.get_int(key)
+        raw = params.get(key)
       except Exception:
         return default
-      return default if v is None else v * scale
+      if raw is None:
+        return default
+      if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", "replace")
+      try:
+        return float(str(raw).strip()) * scale
+      except (TypeError, ValueError):
+        return default
 
     return cls(
       ctrl_mode=int(num("AutoNaviSpeedCtrlMode", 2)),

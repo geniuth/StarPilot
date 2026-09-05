@@ -209,3 +209,52 @@ class TestDesiredSpeed:
     n = navi(sdiType=1, sdiSpeedLimit=80, sdiDistance=300, sdiBlockType=2, sdiBlockDistance=5000)
     speed, source = desired_speed(n, cfg(), road_limit_kph=110.0)
     assert (speed, source) == (80.0, "section")
+
+
+class FakeParams:
+  """Mimics openpilot's Params: get() returns None for anything unset."""
+
+  def __init__(self, values=None):
+    self.values = values or {}
+
+  def get(self, key, *a, **kw):
+    return self.values.get(key)
+
+
+class TestConfigFromParams:
+  def test_unset_params_fall_back_to_defaults(self):
+    # get_int() reports an unset key as 0, which would silently disable the feature;
+    # reading through get() keeps the documented defaults instead
+    cfg = NaviSpeedConfig.from_params(FakeParams())
+    assert cfg.ctrl_mode == 2
+    assert cfg.ctrl_end == 10.0
+    assert cfg.safety_factor == 1.0
+    assert cfg.decel_rate == 0.8
+
+  def test_stored_values_are_scaled_out_of_their_integer_units(self):
+    cfg = NaviSpeedConfig.from_params(FakeParams({
+      "AutoNaviSpeedCtrlMode": "3",
+      "AutoNaviSpeedDecelRate": "80",
+      "AutoNaviSpeedSafetyFactor": "90",
+      "MapTurnSpeedFactor": "110",
+    }))
+    assert cfg.ctrl_mode == 3
+    assert abs(cfg.decel_rate - 0.8) < 1e-9
+    assert abs(cfg.safety_factor - 0.9) < 1e-9
+    assert abs(cfg.map_turn_factor - 1.1) < 1e-9
+
+  def test_explicit_zero_is_respected(self):
+    # switching the feature off must still work
+    assert NaviSpeedConfig.from_params(FakeParams({"AutoNaviSpeedCtrlMode": "0"})).ctrl_mode == 0
+
+  def test_bytes_values(self):
+    assert NaviSpeedConfig.from_params(FakeParams({"AutoNaviSpeedCtrlMode": b"3"})).ctrl_mode == 3
+
+  def test_garbage_falls_back(self):
+    assert NaviSpeedConfig.from_params(FakeParams({"AutoNaviSpeedCtrlMode": "abc"})).ctrl_mode == 2
+
+  def test_a_raising_params_object_falls_back(self):
+    class Boom:
+      def get(self, *a, **kw):
+        raise RuntimeError("unknown key")
+    assert NaviSpeedConfig.from_params(Boom()).ctrl_mode == 2

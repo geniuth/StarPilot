@@ -130,13 +130,15 @@ def _read_http_request(conn):
   return path, body[:length], headers
 
 
-def serve_7713(store, stop):
+def serve_7713(store, stop, port=HTTP_PORT, on_bind=None):
   srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-  srv.bind(("0.0.0.0", HTTP_PORT))
+  srv.bind(("0.0.0.0", port))
   srv.listen(8)
   srv.settimeout(0.5)
-  _log().info("carrot navi: listening for legacy HTTP on %d", HTTP_PORT)
+  if on_bind is not None:
+    on_bind(srv.getsockname()[1])
+  _log().info("carrot navi: listening for legacy HTTP on %d", srv.getsockname()[1])
 
   while not stop.is_set():
     try:
@@ -241,13 +243,15 @@ def _ws_recv_frames(conn, buf):
   return out, buf
 
 
-def serve_7714(store, stop):
+def serve_7714(store, stop, port=WS_PORT, on_bind=None):
   srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-  srv.bind(("0.0.0.0", WS_PORT))
+  srv.bind(("0.0.0.0", port))
   srv.listen(8)
   srv.settimeout(0.5)
-  _log().info("carrot navi: listening for v2 stream on %d", WS_PORT)
+  if on_bind is not None:
+    on_bind(srv.getsockname()[1])
+  _log().info("carrot navi: listening for v2 stream on %d", srv.getsockname()[1])
 
   while not stop.is_set():
     try:

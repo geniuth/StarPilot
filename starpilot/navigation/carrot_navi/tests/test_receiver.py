@@ -148,30 +148,29 @@ class TestActivityLevel:
 
 class TestLiveHttpServer:
   def test_accepts_a_documented_post(self):
+    # An ephemeral port, so the test does not fight whatever already owns 7713 on a device
     store = NaviStore()
     stop = threading.Event()
-    t = threading.Thread(target=receiver.serve_7713, args=(store, stop), daemon=True)
+    bound = []
+    t = threading.Thread(target=receiver.serve_7713, args=(store, stop),
+                         kwargs={"port": 0, "on_bind": bound.append}, daemon=True)
     t.start()
     try:
       deadline = time.time() + 5.0
+      while not bound and time.time() < deadline:
+        time.sleep(0.02)
+      if not bound:
+        pytest.fail("server never bound")
+
       body = json.dumps({"rgdata": {"nRoadLimitSpeed": 50, "nSdiType": 1,
                                     "nSdiSpeedLimit": 50, "nSdiDist": 420,
                                     "roadcate": 8}}).encode()
-      while time.time() < deadline:
-        try:
-          c = socket.create_connection(("127.0.0.1", receiver.HTTP_PORT), timeout=2.0)
-        except OSError:
-          time.sleep(0.05)
-          continue
-        with c:
-          c.sendall(b"POST /api/navi/1 HTTP/1.1\r\nContent-Length: "
-                    + str(len(body)).encode() + b"\r\n\r\n" + body)
-          assert b"200 OK" in c.recv(4096)
-        break
-      else:
-        pytest.fail("server never came up")
+      with socket.create_connection(("127.0.0.1", bound[0]), timeout=5.0) as c:
+        c.sendall(b"POST /api/navi/1 HTTP/1.1\r\nContent-Length: "
+                  + str(len(body)).encode() + b"\r\n\r\n" + body)
+        assert b"200 OK" in c.recv(4096)
 
-      for _ in range(50):
+      for _ in range(100):
         if store.data.connected:
           break
         time.sleep(0.02)
