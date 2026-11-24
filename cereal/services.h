@@ -70,6 +70,7 @@ static std::map<std::string, service> services = {
   { "bookmarkButton", {"bookmarkButton", true, 0.000000, 1, 256000}},
   { "audioFeedback", {"audioFeedback", true, 0.000000, 1, 256000}},
   { "visionSpeedLimitBookmark", {"visionSpeedLimitBookmark", false, 0.000000, 1, 256000}},
+  { "naviData", {"naviData", true, 0.000000, -1, 256000}},
   { "roadEncodeData", {"roadEncodeData", false, 20.000000, -1, 10485760}},
   { "driverEncodeData", {"driverEncodeData", false, 20.000000, -1, 10485760}},
   { "wideRoadEncodeData", {"wideRoadEncodeData", false, 20.000000, -1, 10485760}},

@@ -87,6 +87,7 @@ _services: dict[str, tuple] = {
   "bookmarkButton": (True, 0., 1),
   "audioFeedback": (True, 0., 1),
   "visionSpeedLimitBookmark": (False, 0., 1),
+  "naviData": (True, 0.),  # NDA phone navigation receiver (road_speed_limiter)
   "roadEncodeData": (False, 20., None, QueueSize.BIG),
   "driverEncodeData": (False, 20., None, QueueSize.BIG),
   "wideRoadEncodeData": (False, 20., None, QueueSize.BIG),

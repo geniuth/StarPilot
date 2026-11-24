@@ -132,6 +132,7 @@ struct OnroadEvent @0xc4fa6047f024e718 {
     audioFeedback @97;
     bigModelLoading @100;
     bigModelFailed @102;
+    ndaCameraWarn @103;
 
     soundsUnavailableDEPRECATED @47;
     stockLkasDEPRECATED @98;
@@ -893,6 +894,8 @@ struct SelfdriveState {
     promptDistracted @8;
 
     preAlert @9;
+
+    speedDown @10;
   }
 
   enum OpenpilotState @0xdbe58b96d2d1ac61 {
@@ -2631,6 +2634,37 @@ struct DebugAlert {
   alertText2 @1 :Text;
 }
 
+# NDA: speed camera / section enforcement / road limit / traffic signal data sent by a phone
+# navigation app (neokii ROAD_LIMIT_SERVICE, e.g. nmirror2) and published by road_speed_limiter.
+struct NaviData {
+  active @0 :Int16;
+  roadLimitSpeed @1 :Int16;
+  isHighway @2 :Bool;
+  camType @3 :Int16;
+  camLimitSpeedLeftDist @4 :Int16;
+  camLimitSpeed @5 :Int16;
+  sectionLimitSpeed @6 :Int16;
+  sectionLeftDist @7 :Int16;
+  sectionAvgSpeed @8 :Int16;
+  sectionLeftTime @9 :Int16;
+  sectionAdjustSpeed @10 :Bool;
+  camSpeedFactor @11 :Float32;
+  currentRoadName @12 :Text;
+  isNda2 @13 :Bool;
+  ts @14 :TrafficSignal;
+  camRearPassed @15 :Bool;
+
+  struct TrafficSignal {
+    isGreenLightOn @0 :Bool;
+    isLeftLightOn @1 :Bool;
+    isRedLightOn @2 :Bool;
+    greenLightRemainTime @3 :Int16;
+    leftLightRemainTime @4 :Int16;
+    redLightRemainTime @5 :Int16;
+    distance @6 :Int16;
+  }
+}
+
 struct UserBookmark @0xfe346a9de48d9b50 {
 }
 
@@ -2759,6 +2793,7 @@ struct Event {
     bookmarkButton @148 :UserBookmark;
     audioFeedback @149 :AudioFeedback;
     visionSpeedLimitBookmark @153 :UserBookmark;
+    naviData @154 :NaviData;
 
     lateralManeuverPlan @150 :LateralManeuverPlan;
     # *********** debug ***********
