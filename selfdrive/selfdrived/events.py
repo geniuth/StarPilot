@@ -282,6 +282,83 @@ def speed_limit_changed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging
     Priority.LOW, VisualAlert.none, AudibleAlert.prompt, 3.0)
 
 
+def get_nda_camera_limits(navi) -> tuple[int, int]:
+  """(min, max) kph an NDA camera/section limit must fall in. Keep in sync with SpeedLimiter.get_max_speed."""
+  is_highway = bool(getattr(navi, 'isHighway', False) or False)
+  min_limit = 40 if is_highway else 20
+  max_limit = 120 if is_highway else 100
+  if int(getattr(navi, 'camType', 0) or 0) == 22:
+    min_limit = 10
+  return min_limit, max_limit
+
+
+def get_nda_camera_warning_context(sm: messaging.SubMaster) -> tuple[float, float]:
+  """(limit_kph, distance_m) of the enforcement camera or section NDA naviData reports, or (0, 0)."""
+  if 'naviData' not in sm.data:
+    return 0.0, 0.0
+  navi = sm['naviData']
+  min_limit, max_limit = get_nda_camera_limits(navi)
+
+  cam_limit = float(getattr(navi, 'camLimitSpeed', 0) or 0.0)
+  cam_distance = float(getattr(navi, 'camLimitSpeedLeftDist', 0) or 0.0)
+  if cam_limit > 0 and cam_distance > 2.0 and min_limit <= cam_limit <= max_limit:
+    return cam_limit, cam_distance
+
+  section_limit = float(getattr(navi, 'sectionLimitSpeed', 0) or 0.0)
+  section_distance = float(getattr(navi, 'sectionLeftDist', 0) or 0.0)
+  if section_limit > 0 and section_distance > 10.0 and min_limit <= section_limit <= max_limit:
+    return section_limit, section_distance
+
+  return 0.0, 0.0
+
+
+def is_nda_rear_camera_hold(sm: messaging.SubMaster) -> bool:
+  return 'naviData' in sm.data and bool(getattr(sm['naviData'], 'camRearPassed', False))
+
+
+def get_nda_camera_warning_policy(current_speed: float, limit_speed: float) -> tuple[float, float, float, int]:
+  """(speed_ratio, repeat_interval_s, alert_duration_s, alert_status): repeat faster the more we are over the limit."""
+  speed_ratio = 0.0
+  if limit_speed > 0:
+    speed_ratio = max(current_speed, 0.0) / limit_speed
+
+  clamped_ratio = min(max(speed_ratio, 0.0), 2.0)
+  if clamped_ratio >= 1.0:
+    interval = 1.2 - (min(clamped_ratio, 1.5) - 1.0) * 0.8
+  elif clamped_ratio >= 0.5:
+    interval = 2.5 - ((clamped_ratio - 0.5) / 0.5) * 1.3
+  else:
+    interval = 2.0
+
+  interval = max(0.8, min(interval, 2.5))
+  duration = interval * 0.4
+  alert_status = AlertStatus.userPrompt if limit_speed > 0 and speed_ratio < 0.7 else AlertStatus.critical
+  return speed_ratio, interval, duration, alert_status
+
+
+def nda_camera_warning_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality,
+                             starpilot_toggles: SimpleNamespace) -> Alert:
+  limit_speed_kph, distance_m = get_nda_camera_warning_context(sm)
+  current_speed_kph = max(float(CS.vEgo), 0.0) * CV.MS_TO_KPH
+  _, _, duration, alert_status = get_nda_camera_warning_policy(current_speed_kph, limit_speed_kph)
+
+  distance_text = f"{max(int(round(distance_m)), 0)} m"
+  if is_nda_rear_camera_hold(sm):
+    distance_text = f"hold {distance_text}"
+
+  if limit_speed_kph > 0:
+    limit_text = f"{int(round(limit_speed_kph))} km/h" if metric else f"{int(round(limit_speed_kph * CV.KPH_TO_MPH))} mph"
+  else:
+    limit_text = "Camera"
+
+  audible_alert = AudibleAlert.speedDown if alert_status == AlertStatus.critical else AudibleAlert.none
+  return Alert(
+    f"{limit_text} 📸 {distance_text}",
+    "",
+    alert_status, AlertSize.small,
+    Priority.HIGH, VisualAlert.none, audible_alert, duration)
+
+
 def calibration_incomplete_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality, starpilot_toggles: SimpleNamespace) -> Alert:
   first_word = 'Recalibrating' if sm['liveCalibration'].calStatus == log.LiveCalibrationData.Status.recalibrating else 'Calibrating'
   return Alert(
@@ -1145,6 +1222,10 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.userBookmark: {
     ET.PERMANENT: NormalPermanentAlert("Bookmark Saved", duration=1.5),
+  },
+
+  EventName.ndaCameraWarn: {
+    ET.WARNING: nda_camera_warning_alert,
   },
 
   EventName.audioFeedback: {

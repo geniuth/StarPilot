@@ -15,6 +15,7 @@ from opendbc.car.gm.values import GMFlags
 from opendbc.car.hyundai.values import CAR as HYUNDAI_CAR
 from opendbc.car.nissan.values import CAR as NISSAN_CAR
 
+from openpilot.common.constants import CV
 from openpilot.common.params import Params
 from openpilot.common.realtime import config_realtime_process, Priority, Ratekeeper, DT_CTRL
 from openpilot.common.swaglog import cloudlog
@@ -23,7 +24,8 @@ from openpilot.common.gps import get_gps_location_service
 from openpilot.selfdrive.car.car_specific import CarSpecificEvents
 from openpilot.selfdrive.car.cruise_state import should_flag_cruise_mismatch
 from openpilot.selfdrive.locationd.helpers import PoseCalibrator, Pose
-from openpilot.selfdrive.selfdrived.events import Events, ET
+from openpilot.selfdrive.road_speed_limiter import SpeedLimiter
+from openpilot.selfdrive.selfdrived.events import Events, ET, get_nda_camera_warning_policy
 from openpilot.selfdrive.selfdrived.helpers import ExcessiveActuationCheck
 from openpilot.selfdrive.selfdrived.state import StateMachine
 from openpilot.selfdrive.selfdrived.alertmanager import AlertManager, set_offroad_alert
@@ -207,7 +209,8 @@ class SelfdriveD:
     # TODO: de-couple selfdrived with card/conflate on carState without introducing controls mismatches
     self.car_state_sock = messaging.sub_sock('carState', timeout=20)
 
-    ignore = self.sensor_packets + self.gps_packets + ['alertDebug', 'lateralManeuverPlan']
+    # naviData only exists while a phone NDA app is connected.
+    ignore = self.sensor_packets + self.gps_packets + ['alertDebug', 'lateralManeuverPlan', 'naviData']
     if SIMULATION:
       ignore += ['driverCameraState', 'managerState']
     if REPLAY:
@@ -217,7 +220,7 @@ class SelfdriveD:
                                    'carOutput', 'driverMonitoringState', 'longitudinalPlan', 'livePose', 'liveDelay',
                                    'managerState', 'liveParameters', 'radarState', 'liveTorqueParameters',
                                    'controlsState', 'carControl', 'driverAssistance', 'alertDebug', 'userBookmark', 'audioFeedback',
-                                   'lateralManeuverPlan'] + \
+                                   'lateralManeuverPlan', 'naviData'] + \
                                    self.camera_packets + self.sensor_packets + self.gps_packets,
                                   ignore_alive=ignore, ignore_avg_freq=ignore,
                                   ignore_valid=ignore, frequency=int(1/DT_CTRL))
@@ -303,6 +306,7 @@ class SelfdriveD:
     self.distance_pressed_previously = False
     self.display_timer = 0
     self.last_below_steer_speed_alert_time = -float("inf")
+    self.last_nda_camera_warn_time = -float("inf")
     self.last_steer_saturated_alert_time = -float("inf")
     self.forcing_stop_chime_played = False
 
@@ -317,6 +321,25 @@ class SelfdriveD:
     self.has_menu = self.CP.brand == "gm" and not (self.CP.flags & GMFlags.NO_CAMERA.value)
 
     self.FPCP = messaging.log_from_bytes(self.params.get("StarPilotCarParams", block=True), custom.StarPilotCarParams)
+
+  def update_nda_camera_warning(self, CS: car.CarState) -> None:
+    """Warn while approaching an NDA enforcement camera faster than 85% of its limit. Display/sound only."""
+    navi_frame = self.sm.recv_frame.get('naviData', 0)
+    navi_recent = navi_frame > 0 and (self.sm.frame - navi_frame) * DT_CTRL < 2.0
+    if not navi_recent:
+      return
+
+    apply_limit_speed, _, left_dist, _, _ = SpeedLimiter.instance().get_max_speed(CS, float(CS.vCruise))
+    current_speed_kph = max(float(CS.vEgo), 0.0) * CV.MS_TO_KPH
+    if apply_limit_speed <= 0 or left_dist <= 2.0 or left_dist >= 1000.0 or current_speed_kph <= 5.0:
+      return
+
+    _, alert_interval, _, _ = get_nda_camera_warning_policy(current_speed_kph, apply_limit_speed)
+    if current_speed_kph > apply_limit_speed * 0.85:
+      now = time.monotonic()
+      if now - self.last_nda_camera_warn_time >= alert_interval:
+        self.events.add(EventName.ndaCameraWarn)
+        self.last_nda_camera_warn_time = now
 
   def update_ecu_disable_failed(self):
     if self.ecu_disable_failed_checked:
@@ -788,6 +811,8 @@ class SelfdriveD:
     planner_fcw = self.sm['longitudinalPlan'].fcw and self.enabled
     if (planner_fcw or model_fcw) and not self.CP.notCar:
       self.events.add(EventName.fcw)
+
+    self.update_nda_camera_warning(CS)
 
     # GPS checks
     gps_ok = self.sm.recv_frame[self.gps_location_service] > 0 and (self.sm.frame - self.sm.recv_frame[self.gps_location_service]) * DT_CTRL < 2.0

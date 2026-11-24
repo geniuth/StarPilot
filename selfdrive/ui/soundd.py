@@ -112,6 +112,7 @@ sound_list: dict[int, tuple[str, int | None, float]] = {
 
   AudibleAlert.warningSoft: ("warning_soft.wav", None, MAX_VOLUME),
   AudibleAlert.warningImmediate: ("warning_immediate.wav", None, MAX_VOLUME),
+  AudibleAlert.speedDown: ("speeddown.wav", 3, MAX_VOLUME),
 
   starpilot_alert_key(StarPilotAudibleAlert.angry): ("angry.wav", 1, MAX_VOLUME),
   starpilot_alert_key(StarPilotAudibleAlert.continued): ("continued.wav", 1, MAX_VOLUME),
@@ -527,6 +528,7 @@ class Soundd:
 
       AudibleAlert.warningSoft: settings["WarningSoftVolume"] / 100.0,
       AudibleAlert.warningImmediate: settings["WarningImmediateVolume"] / 100.0,
+      AudibleAlert.speedDown: settings["PromptVolume"] / 100.0,
 
       starpilot_alert_key(StarPilotAudibleAlert.goat): settings["PromptVolume"] / 100.0,
       starpilot_alert_key(StarPilotAudibleAlert.startup): settings["EngageVolume"] / 100.0
