@@ -375,9 +375,12 @@ class StarPilotPlanner:
 
     starpilotPlan.roadCurvature = self.road_curvature
 
-    starpilotPlan.slcMapSpeedLimit = self.starpilot_vcruise.slc.map_speed_limit
+    # NDA (phone navigation) values win while the app reports them; otherwise SLC's own sources.
+    nda_road_limit = getattr(self.starpilot_vcruise, "nda_road_limit", 0.0)
+    nda_next_limit = getattr(self.starpilot_vcruise, "nda_next_limit", 0.0)
+    starpilotPlan.slcMapSpeedLimit = nda_road_limit if nda_road_limit > 0 else self.starpilot_vcruise.slc.map_speed_limit
     starpilotPlan.slcMapboxSpeedLimit = self.starpilot_vcruise.slc.mapbox_limit
-    starpilotPlan.slcNextSpeedLimit = self.starpilot_vcruise.slc.next_speed_limit
+    starpilotPlan.slcNextSpeedLimit = nda_next_limit if nda_next_limit > 0 else self.starpilot_vcruise.slc.next_speed_limit
     starpilotPlan.slcOverriddenSpeed = self.starpilot_vcruise.slc.overridden_speed
     starpilotPlan.slcSpeedLimit = self.starpilot_vcruise.slc_target
     starpilotPlan.slcSpeedLimitOffset = self.starpilot_vcruise.slc_offset

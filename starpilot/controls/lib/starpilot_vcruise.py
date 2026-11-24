@@ -4,6 +4,7 @@ import math
 
 from openpilot.common.constants import CV
 from openpilot.common.realtime import DT_MDL
+from openpilot.selfdrive.road_speed_limiter import SpeedLimiter
 
 from openpilot.starpilot.common.starpilot_variables import CRUISING_SPEED
 from openpilot.starpilot.controls.lib.curve_speed_controller import (
@@ -180,6 +181,12 @@ class StarPilotVCruise:
 
     self.csc = CurveSpeedController(self)
     self.slc = SpeedLimitController(self)
+
+    # NDA: camera / section enforcement and road limit from a phone navigation app (naviData).
+    self.speed_limiter = SpeedLimiter.instance()
+    self.nda_target = 0.0
+    self.nda_road_limit = 0.0
+    self.nda_next_limit = 0.0
 
     self.forcing_stop = False
     self.override_force_stop = False
@@ -649,6 +656,7 @@ class StarPilotVCruise:
     self.csc.log_data(v_ego, sm)
 
     self.nav_turn_target = self._get_nav_turn_control_target(v_cruise, sm, starpilot_toggles)
+    self._update_nda_targets(v_cruise, sm)
 
     # Single tuning knob (signed feet -> meters). Defense clamp on top of UI bounds.
     offset_ft_raw = int(getattr(starpilot_toggles, 'force_stop_distance_offset', 0) or 0)
@@ -765,6 +773,8 @@ class StarPilotVCruise:
         targets.append(slc_control_target)
       if self.nav_turn_target > 0.0:
         targets.append(self.nav_turn_target)
+      if self.nda_target > 0.0:
+        targets.append(self.nda_target)
 
       # Far-approach envelope: bleed speed off before commit so the car isn't still at
       # cruise when the kinematic curve takes over. Same vetoes as the activation paths;
@@ -792,3 +802,15 @@ class StarPilotVCruise:
 
     self.controls_enabled_previously = controls_enabled
     return v_cruise
+
+  def _update_nda_targets(self, v_cruise, sm):
+    """NDA camera/section slowdown target, independent of SLC. All values m/s, 0 = none."""
+    try:
+      apply_kph, limit_kph, left_dist, _, _ = self.speed_limiter.get_max_speed(sm["carState"], v_cruise * CV.MS_TO_KPH)
+      road_limit_kph = float(self.speed_limiter.get_road_limit_speed() or 0.0)
+    except Exception:
+      apply_kph = limit_kph = left_dist = road_limit_kph = 0.0
+    # Below 20 km/h is a speed bump hint, not something to cruise at.
+    self.nda_target = float(apply_kph) * CV.KPH_TO_MS if apply_kph >= 20 else 0.0
+    self.nda_road_limit = max(road_limit_kph, 0.0) * CV.KPH_TO_MS
+    self.nda_next_limit = float(limit_kph) * CV.KPH_TO_MS if limit_kph > 0 and left_dist > 0 else 0.0
