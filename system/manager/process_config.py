@@ -90,6 +90,18 @@ def camera_run(started: bool, params: Params, CP: car.CarParams, starpilot_toggl
 def livestream(started: bool, params: Params, CP: car.CarParams, starpilot_toggles: SimpleNamespace) -> bool:
   return params.get_bool("IsLiveStreaming")
 
+# MyID4 / Wayon remote monitoring over Cloudflare. Everything stays off until the device has
+# /data/wayon_cloud/config.json (endpoint, token). A live-view viewer makes wayon_live create
+# WAYON_LIVE_ACTIVE_PATH, which brings camerad/stream_encoderd up while offroad.
+WAYON_CLOUD_CONFIG = "/data/wayon_cloud/config.json"
+WAYON_LIVE_ACTIVE_PATH = "/tmp/wayon_live.active"
+
+def wayon_remote_ready(started: bool, params: Params, CP: car.CarParams, starpilot_toggles: SimpleNamespace) -> bool:
+  return os.path.isfile(WAYON_CLOUD_CONFIG)
+
+def wayon_live_streaming(started: bool, params: Params, CP: car.CarParams, starpilot_toggles: SimpleNamespace) -> bool:
+  return os.path.isfile(WAYON_LIVE_ACTIVE_PATH)
+
 def or_(*fns):
   return lambda *args: operator.or_(*(fn(*args) for fn in fns))
 
@@ -164,10 +176,11 @@ procs = [
 
   NativeProcess("loggerd", "system/loggerd", ["./loggerd"], and_(allow_logging, logging)),
   NativeProcess("encoderd", "system/loggerd", ["./encoderd"], and_(allow_logging, only_onroad)),
-  NativeProcess("stream_encoderd", "system/loggerd", ["./encoderd", "--stream"], or_(and_(livestream, not_(iscar)), notcar)),
+  NativeProcess("stream_encoderd", "system/loggerd", ["./encoderd", "--stream"],
+                or_(or_(and_(livestream, not_(iscar)), notcar), wayon_live_streaming)),
   PythonProcess("logmessaged", "system.logmessaged", always_run),
 
-  NativeProcess("camerad", "system/camerad", ["./camerad"], or_(camera_run, livestream), enabled=not WEBCAM,
+  NativeProcess("camerad", "system/camerad", ["./camerad"], or_(or_(camera_run, livestream), wayon_live_streaming), enabled=not WEBCAM,
                 watchdog_max_dt=CAMERAD_WATCHDOG_MAX_DT),
   PythonProcess("webcamerad", "tools.webcam.camerad", driverview, enabled=WEBCAM),
   PythonProcess("proclogd", "system.proclogd", and_(allow_logging, only_onroad), enabled=platform.system() != "Darwin"),
@@ -221,6 +234,10 @@ procs += [
   PythonProcess("bluetooth_managerd", "starpilot.system.bluetooth.daemon", bluetooth_enabled, enabled=TICI),
   # Navdy HUD over Bluetooth RFCOMM. Idles offroad; settings in /data/navdy_hud.json.
   PythonProcess("navdy_hud", "selfdrive.eon_cluster.navdy_hud", always_run, enabled=TICI),
+  # MyID4 monitoring: 360 live view server, Cloudflare tunnel supervisor, vehicle telemetry upload.
+  PythonProcess("wayon_live", "system.wayon_live_stream", wayon_remote_ready, enabled=TICI),
+  PythonProcess("wayon_remote", "system.wayon_remote", wayon_remote_ready, enabled=TICI),
+  PythonProcess("wayon_telemetry", "system.wayon_vehicle_telemetry", wayon_remote_ready, enabled=TICI),
   PythonProcess("wheel_controlsd", "starpilot.system.wheel_controls.wheel_controlsd", wheel_controls_enabled, enabled=TICI, nice=19),
   PythonProcess("the_galaxy", "starpilot.system.the_galaxy.the_galaxy", always_run, nice=10),
   PythonProcess("galaxy", "starpilot.system.galaxy.galaxy", always_run, nice=10),
