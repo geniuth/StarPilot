@@ -49,6 +49,14 @@ REPLAY = "REPLAY" in os.environ
 SIMULATION = "SIMULATION" in os.environ
 TESTING_CLOSET = "TESTING_CLOSET" in os.environ
 
+# Helpers that never affect driving: a crash (they are restarted) must not raise processNotRunning.
+AUXILIARY_PROCESSES = frozenset({
+  "stinger_object_shadow",
+  "road_speed_limiter",  # NDA phone receiver
+  "navdy_hud",           # Navdy HUD over Bluetooth
+  "wayon_live", "wayon_remote", "wayon_telemetry",  # MyID4 monitoring over Cloudflare
+})
+
 LONGITUDINAL_PERSONALITY_MAP = {v: k for k, v in log.LongitudinalPersonality.schema.enumerants.items()}
 
 ThermalStatus = log.DeviceState.ThermalStatus
@@ -688,7 +696,7 @@ class SelfdriveD:
       self.events.add(EventName.bigModelFailed)
 
     not_running = {p.name for p in self.sm['managerState'].processes
-                   if not p.running and p.shouldBeRunning and p.name != 'stinger_object_shadow'}
+                   if not p.running and p.shouldBeRunning and p.name not in AUXILIARY_PROCESSES}
     if self.sm.recv_frame['managerState'] and len(not_running):
       if not_running != self.not_running_prev:
         cloudlog.event("process_not_running", not_running=not_running, error=True)

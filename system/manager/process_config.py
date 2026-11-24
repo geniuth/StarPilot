@@ -219,6 +219,8 @@ procs = [
 # StarPilot variables
 procs += [
   PythonProcess("bluetooth_managerd", "starpilot.system.bluetooth.daemon", bluetooth_enabled, enabled=TICI),
+  # Navdy HUD over Bluetooth RFCOMM. Idles offroad; settings in /data/navdy_hud.json.
+  PythonProcess("navdy_hud", "selfdrive.eon_cluster.navdy_hud", always_run, enabled=TICI),
   PythonProcess("wheel_controlsd", "starpilot.system.wheel_controls.wheel_controlsd", wheel_controls_enabled, enabled=TICI, nice=19),
   PythonProcess("the_galaxy", "starpilot.system.the_galaxy.the_galaxy", always_run, nice=10),
   PythonProcess("galaxy", "starpilot.system.galaxy.galaxy", always_run, nice=10),
