@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa: E702  (offline diagnostic tool)
 """관측된 CAN 주소 중 DBC에 정의되지 않은 것(미식별)을 버스별로 뽑는다.
 공조 '명령' 메시지 후보를 좁히는 용도."""
 import sys
@@ -9,9 +10,8 @@ from collections import defaultdict
 # Resolve the repo root from this file, so the tool works wherever the fork is installed
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from openpilot.tools.lib.logreader import LogReader
-from opendbc.can import CANDefine
 try:
-    from opendbc.can.parser import dbc_lookup  # noqa
+    from opendbc.can.parser import dbc_lookup
 except Exception:
     dbc_lookup = None
 
@@ -21,7 +21,6 @@ SEG = sys.argv[2] if len(sys.argv) > 2 else '5'
 # DBC 정의 주소 수집
 defined = {}
 try:
-    from opendbc.can import CANParser
     import opendbc
     import os
     dbc_path = None

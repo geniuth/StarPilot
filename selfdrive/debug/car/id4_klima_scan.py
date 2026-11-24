@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa: ISC002, B905  (offline diagnostic tool)
 """ID.4(MEB) 공조 제어 프레임 정찰 — 라이브 CAN 수신 전용.
 
 jagheterfredrik/meb-preheat 가 리버싱한 확장 ID 프레임들이 우리 콤마의
@@ -21,7 +22,6 @@ import argparse
 import sys
 from pathlib import Path
 import time
-from collections import defaultdict
 
 # Resolve the repo root from this file, so the tool works wherever the fork is installed
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))

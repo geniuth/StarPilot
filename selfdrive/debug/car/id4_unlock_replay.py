@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa: ISC002  (offline diagnostic tool)
 """ID.4(MEB) 원격 언락 재현 — 저장된 rlog 에서 언락 순간 분석 (수신 전용).
 
 id4_unlock_scan.py 의 라이브 버전과 짝이다. 차 앞에서 SSH 붙어 있을 필요 없이,
@@ -137,7 +138,7 @@ def analyze(route: str, seg_from: int, seg_to: int, dump_all: bool) -> bool:
         rel, bus, payload = pick
         print(f"  언락 순간 {len(unlocks)}회 검출. 대표 페이로드:")
         print(f"    bus{bus}  {hexs(payload)}   (@ {rel:.1f}s)")
-        print(f"\n  → 재생 검증(1-b)에 이대로 넣으면 된다:")
+        print("\n  → 재생 검증(1-b)에 이대로 넣으면 된다:")
         print(f"    python3 id4_unlock_replay_test.py --bus {bus} "
               f"--payload {payload.hex()} --confirm")
     else:

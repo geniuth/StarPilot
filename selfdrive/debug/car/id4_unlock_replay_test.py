@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa: ISC002  (offline diagnostic tool)
 """ID.4(MEB) 원격 언락 재현 — 1-b단계: 언락 프레임 재생 검증 (수동, 위험).
 
 정찰(id4_unlock_scan.py)에서 확인한 Blinkmodi_02(0x366)의 언락 페이로드를

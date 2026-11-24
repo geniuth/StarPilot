@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa: ISC002, B905  (offline diagnostic tool)
 """ID.4(MEB) 공조 제어 프레임 정찰 — 저장된 rlog 분석용.
 
 id4_klima_scan.py 와 같은 분석을 이미 녹화된 주행 로그에서 한다.
@@ -17,7 +18,6 @@ import argparse
 import glob
 import sys
 from pathlib import Path
-from collections import defaultdict
 
 # Resolve the repo root from this file, so the tool works wherever the fork is installed
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))

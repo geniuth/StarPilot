@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa: ISC002, F841  (offline diagnostic tool)
 """ID.4(MEB) 원격 언락 재현 — 1-a단계: 잠금/해제 신호 정찰 (수신 전용).
 
 목표: 스마트키로 차량을 잠그고/풀 때 Blinkmodi_02(0x366)의 BM_ZV_auf(언락),

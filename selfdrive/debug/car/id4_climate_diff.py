@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa: B905  (offline diagnostic tool)
 """공조 조작 시점에 변하는 CAN 바이트를 찾아낸다 (변화점 탐지).
 
 사용법:
@@ -26,7 +27,8 @@ from openpilot.tools.lib.logreader import LogReader
 
 KNOWN_NAMES = {}
 try:
-    import opendbc, os
+    import opendbc
+    import os
     for root, _, files in os.walk(os.path.dirname(opendbc.__file__)):
         if 'vw_meb.dbc' in files:
             with open(os.path.join(root, 'vw_meb.dbc'), encoding='utf-8', errors='replace') as f:

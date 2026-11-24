@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa: B905, E702  (offline diagnostic tool)
 """지정한 시각 창(window) 안에서 바뀐 CAN 바이트만 보여준다.
 공조 조작 순간에 함께 변한 메시지 = 명령 후보.
 
@@ -16,7 +17,8 @@ from openpilot.tools.lib.logreader import LogReader
 
 NAMES = {}
 try:
-    import opendbc, os
+    import opendbc
+    import os
     for root, _, files in os.walk(os.path.dirname(opendbc.__file__)):
         if 'vw_meb.dbc' in files:
             for line in open(os.path.join(root, 'vw_meb.dbc'), encoding='utf-8', errors='replace'):

@@ -20,7 +20,7 @@ BLOWER_JUMP = 0.8   # 이 이상 급변하면 수동 조작으로 본다
 MSGS = [("Klima_11", 5), ("Klima_12", 5)]
 hits = 0
 
-for seg in range(0, SMAX + 1):
+for seg in range(SMAX + 1):
     files = glob.glob(f'/data/media/0/realdata/{ROUTE}--{seg}/rlog*')
     if not files:
         continue

@@ -39,10 +39,10 @@ log_capnp = capnp.load(str(REPO_ROOT / "cereal/log.capnp"),
 sys.path.insert(0, str(REPO_ROOT / "opendbc_repo"))
 sys.path.insert(0, str(REPO_ROOT))
 
-from opendbc.car import Bus                              # noqa: E402
-from opendbc.car.volkswagen.carstate import CarState     # noqa: E402
-from opendbc.car.volkswagen.interface import CarInterface  # noqa: E402
-from opendbc.car.volkswagen.values import CAR            # noqa: E402
+from opendbc.car import Bus
+from opendbc.car.volkswagen.carstate import CarState
+from opendbc.car.volkswagen.interface import CarInterface
+from opendbc.car.volkswagen.values import CAR
 
 
 def read_events(path):
