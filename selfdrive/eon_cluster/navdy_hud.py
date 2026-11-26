@@ -23,6 +23,7 @@ import signal
 import time
 
 from cereal import messaging
+from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 from openpilot.selfdrive.eon_cluster import bt_link
 
@@ -37,7 +38,9 @@ SPEED_BUMP_CAM_TYPE = 22
 TRAFFIC_LAMPS = (("red", "isRedLightOn", "redLightRemainTime"),
                  ("left", "isLeftLightOn", "leftLightRemainTime"),
                  ("green", "isGreenLightOn", "greenLightRemainTime"))
-SERVICES = ["carState", "selfdriveState", "deviceState", "modelV2", "radarState",
+# carState is the only busy service here. msgq evicts every subscriber of a service once more than 15
+# readers attach, so this process must not add readers to carState/deviceState beyond this one.
+SERVICES = ["carState", "selfdriveState", "modelV2", "radarState",
             "starpilotPlan", "starpilotRadarState", "naviData"]
 
 
@@ -220,6 +223,9 @@ def main():
   signal.signal(signal.SIGTERM, lambda *_: running.__setitem__(0, False))
 
   sm = messaging.SubMaster(SERVICES)
+  params = Params()
+  onroad = False
+  next_onroad_check = 0.0
   config = read_config()
   next_config = time.monotonic() + CONFIG_REFRESH_S
   link = None
@@ -248,7 +254,12 @@ def main():
           cloudlog.info(f"navdy_hud: bluetooth link unavailable: {e}")
 
     sm.update(0)
-    onroad = bool(sm.seen["deviceState"] and sm["deviceState"].started)
+    if started_at >= next_onroad_check:
+      try:
+        onroad = params.get_bool("IsOnroad")
+      except Exception:
+        onroad = False
+      next_onroad_check = started_at + 1.0
     active = config["enabled"] and onroad
     if link is not None:
       link.set_active(active)

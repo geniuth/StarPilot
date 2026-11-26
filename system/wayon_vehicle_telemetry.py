@@ -660,7 +660,10 @@ def post_state(config: dict, payload: dict, timeout=(10, 30)) -> bool:
 def main() -> None:
   params = Params()
   # carrot에는 liveLocationKalman이 없다 (gpsLocation / gpsLocationExternal 사용)
-  sm = messaging.SubMaster(["carState", "gpsLocation", "gpsLocationExternal", "peripheralState"])
+  # carState is deliberately not subscribed: msgq evicts every subscriber of a service once more than
+  # 15 readers attach, and carState already has ~14 on StarPilot (commIssue on 2026-11-26).
+  # Battery comes from the direct CAN sample, speed from livePose.
+  sm = messaging.SubMaster(["livePose", "gpsLocation", "gpsLocationExternal", "peripheralState"])
 
   last = load_last_state()
   charge_ledger = load_charge_ledger()
@@ -712,27 +715,9 @@ def main() -> None:
             trip.add_point(float(g.latitude), float(g.longitude), float(g.speed), now)
             break
 
-    # 배터리 잔량: 주행 중엔 carState(가벼움), 주차 중엔 CAN 직접 샘플링으로 얻는다.
-    # (card 프로세스가 온로드 전용이라 주차 중엔 carState가 비어 충전 감시가 안 됐다)
+    # 배터리 잔량은 주행·주차 모두 아래의 CAN 직접 샘플(Motor_16)에서만 얻는다.
+    # carState 는 구독하지 않는다(위 SubMaster 주석: msgq 구독자 15개 초과 시 전원 퇴출).
     battery_wh = None
-    if sm.updated["carState"] and sm.valid["carState"]:
-      gauge = sm["carState"].fuelGauge
-      # carstate 가 1.0 에서 잘라 넣으므로 1.0 은 무효값(102kWh 등)이 잘린 것일 수 있다 -> 버림
-      if 0 < gauge < 1.0:
-        battery_wh = valid_battery_wh(gauge * CARSTATE_GAUGE_FULL_WH)
-    trip.note_battery(battery_wh)
-
-    # 주차 중 배터리 증가 기울기로 충전 전력 추정
-    if battery_wh is not None:
-      if last_battery_wh is not None and last_battery_at is not None:
-        dt_h = (now - last_battery_at) / 3600.0
-        if dt_h > 0.02:  # 최소 ~1분 간격에서만 산출 (노이즈 방지)
-          delta_wh = battery_wh - last_battery_wh
-          charge_power_w = delta_wh / dt_h if delta_wh > 0 else None
-      if last_battery_wh is None or last_battery_at is None or \
-         abs(battery_wh - (last_battery_wh or 0)) >= BATTERY_DELTA_TRIGGER_WH:
-        last_battery_wh = battery_wh
-        last_battery_at = now
 
     # 도어 잠금/열림: 매초 확인하고, 바뀌면 다음 주기를 기다리지 않고 올린다.
     door = read_door_state(get_can_sock())
@@ -758,7 +743,6 @@ def main() -> None:
     # 배터리/오도미터/외기온·용량은 CAN에서 직접 샘플링 (업로드 직전에만).
     # 차가 완전히 잠들면 CAN이 없어 빈 dict가 온다.
     # 주행 중 가벼운 업로드(3초)는 CAN 을 다시 읽지 않고 직전 샘플을 재사용한다.
-    # 배터리는 carState 값이 더 최신이므로 재사용 샘플에서는 뺀다.
     full = (not onroad or last_full_at is None or battery_moved
             or now - last_full_at >= TELEMETRY_ONROAD_FULL_S)
     if full:
@@ -766,10 +750,10 @@ def main() -> None:
       cached_sampled = dict(sampled)
       last_full_at = now
     else:
-      sampled = {k: v for k, v in cached_sampled.items()
-                 if k not in ("battery_wh", "battery_power_w", "battery_current_a")}
+      # Without carState the last CAN sample is the freshest battery value; keep it (30 s old at most).
+      sampled = dict(cached_sampled)
 
-    # 주차 중엔 carState가 없으므로 CAN 샘플값이 배터리의 유일한 소스가 된다.
+    # CAN 샘플값이 배터리의 유일한 소스다(주행 중 가벼운 업로드는 30초 이내 직전 샘플).
     if sampled.get("battery_wh"):
       battery_wh = sampled["battery_wh"]
       trip.note_battery(battery_wh)
@@ -882,10 +866,10 @@ def main() -> None:
     # 주행 속도: 바퀴 속도(carState.vEgo). Worker 는 vehicleSpeedMps 를 GPS 속도보다 먼저 쓰므로
     # GPS 가 비어도(터널·수신 불량) 앱에 속도가 나온다(carrot-ha collector 와 같은 방식).
     # CAN 샘플링에 몇 초 걸리므로 10초 이내에 받은 carState 면 쓴다.
-    if onroad and sm.seen.get("carState") and time.monotonic() - sm.recv_time["carState"] < 10:
-      cs = sm["carState"]
-      if cs.canValid:
-        payload["vehicleSpeedMps"] = round(float(cs.vEgo), 2)
+    if onroad and sm.seen.get("livePose") and time.monotonic() - sm.recv_time["livePose"] < 10:
+      lp = sm["livePose"]
+      if lp.sensorsOK:
+        payload["vehicleSpeedMps"] = round(max(float(lp.velocityDevice.x), 0.0), 2)
 
     for gps_service in ("gpsLocationExternal", "gpsLocation"):
       if sm.valid.get(gps_service) and sm.seen.get(gps_service):

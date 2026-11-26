@@ -100,7 +100,8 @@ class NaviServer:
       except Exception:
         gps_service = "gpsLocationExternal"
     self.gps_service = gps_service
-    self.sm = messaging.SubMaster([gps_service, 'carState'], frequency=int(1. / DT_CTRL))
+    # No carState: msgq evicts all subscribers past 15 readers and carState is already near that.
+    self.sm = messaging.SubMaster([gps_service], frequency=int(1. / DT_CTRL))
     self.json_road_limit = None
     self.json_traffic_signal = None
     self.active = 0
@@ -312,8 +313,9 @@ def main():
         dat.naviData.isNda2 = server.get_limit_val('is_nda2', False)
         dat.naviData.ts = traffic_signal_fields(server.json_traffic_signal)
 
-        if sm.updated['carState']:
-          v_ego_q.append(sm['carState'].vEgo)
+        gps = sm[server.gps_service]
+        if sm.updated[server.gps_service] and sm.valid[server.gps_service] and gps.hasFix:
+          v_ego_q.append(max(float(gps.speed), 0.0))
 
         v_ego = float(np.mean(v_ego_q)) if len(v_ego_q) > 0 else 0.0
         now = time.monotonic()
