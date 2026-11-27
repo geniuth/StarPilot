@@ -262,9 +262,10 @@ class CarState(CarStateBase):
     ret.lowSpeedAlert = self.update_low_speed_alert(ret.vEgo)
 
     # The stock ACC keeps classifying its lead even under openpilot longitudinal: openpilot only
-    # replaces MEB_ACC_01 toward the cluster, the original still arrives on the ACC side (ext_cp).
+    # replaces this cluster HUD message (0x300, ACC_19 in the generated DBCs, MEB_ACC_01 in vw_meb.dbc)
+    # toward the cluster; the original still arrives on the ACC side (ext_cp).
     fp_ret = custom.StarPilotCarState.new_message()
-    acc_hud = ext_cp.vl["MEB_ACC_01"]
+    acc_hud = ext_cp.vl["ACC_19"]
     if acc_hud["Lead_Type_Detected"]:
       fp_ret.leadObjectType = int(acc_hud["Lead_Type"])
       fp_ret.leadObjectDistance = float(acc_hud["Lead_Distance"])
@@ -501,9 +502,11 @@ class CarState(CarStateBase):
     if CP.networkLocation == NetworkLocation.gateway:
       cam_messages.append(("AWV_03", 1))
 
-    # Stock ACC cluster HUD, only read for the lead object class. Frequency 0 = optional: it never
-    # affects canValid (MEB_ACC_01 has no counter/checksum either).
-    (cam_messages if CP.networkLocation == NetworkLocation.gateway else pt_messages).append(("MEB_ACC_01", 0))
+    # Stock ACC cluster HUD (0x300), read under openpilot longitudinal only for the lead object class.
+    # Frequency 0 = optional: it never affects canValid, and it has no counter/checksum. With stock
+    # longitudinal (pcmCruise) it is already read for the cruise speed and keeps its normal checks.
+    if not CP.pcmCruise:
+      (cam_messages if CP.networkLocation == NetworkLocation.gateway else pt_messages).append(("ACC_19", 0))
 
     return {
       Bus.pt: CANParser(DBC[CP.carFingerprint][Bus.pt], pt_messages, CanBus(CP).pt),
