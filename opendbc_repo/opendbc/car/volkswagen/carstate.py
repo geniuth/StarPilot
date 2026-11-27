@@ -261,8 +261,16 @@ class CarState(CarStateBase):
     ret.buttonEvents = self.create_button_events(pt_cp, self.CCP.BUTTONS)
     ret.lowSpeedAlert = self.update_low_speed_alert(ret.vEgo)
 
+    # The stock ACC keeps classifying its lead even under openpilot longitudinal: openpilot only
+    # replaces MEB_ACC_01 toward the cluster, the original still arrives on the ACC side (ext_cp).
+    fp_ret = custom.StarPilotCarState.new_message()
+    acc_hud = ext_cp.vl["MEB_ACC_01"]
+    if acc_hud["Lead_Type_Detected"]:
+      fp_ret.leadObjectType = int(acc_hud["Lead_Type"])
+      fp_ret.leadObjectDistance = float(acc_hud["Lead_Distance"])
+
     self.frame += 1
-    return ret, custom.StarPilotCarState.new_message()
+    return ret, fp_ret
 
   def update_pq(self, pt_cp, cam_cp, ext_cp) -> structs.CarState:
     ret = structs.CarState()
@@ -492,6 +500,10 @@ class CarState(CarStateBase):
     cam_messages = []
     if CP.networkLocation == NetworkLocation.gateway:
       cam_messages.append(("AWV_03", 1))
+
+    # Stock ACC cluster HUD, only read for the lead object class. Frequency 0 = optional: it never
+    # affects canValid (MEB_ACC_01 has no counter/checksum either).
+    (cam_messages if CP.networkLocation == NetworkLocation.gateway else pt_messages).append(("MEB_ACC_01", 0))
 
     return {
       Bus.pt: CANParser(DBC[CP.carFingerprint][Bus.pt], pt_messages, CanBus(CP).pt),

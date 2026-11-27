@@ -263,3 +263,14 @@ class TestSpeedLimiter:
     limiter.logMonoTime = time.monotonic_ns() - int(5e9)
     assert limiter.get_max_speed(SimpleNamespace(vEgo=20.0), 100.0)[0] == 0
     assert not limiter.rear_passed and not limiter.slowing_down
+
+
+def test_starpilot_car_state_lead_object_fields_round_trip():
+  pytest.importorskip("capnp")
+  from cereal import custom
+  msg = custom.StarPilotCarState.new_message()
+  assert msg.leadObjectType == 0 and msg.leadObjectDistance == 0.0
+  msg.leadObjectType = 4
+  msg.leadObjectDistance = 23.4
+  with custom.StarPilotCarState.from_bytes(msg.to_bytes()) as decoded:
+    assert decoded.leadObjectType == 4 and abs(decoded.leadObjectDistance - 23.4) < 1e-3

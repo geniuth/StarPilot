@@ -113,3 +113,22 @@ def test_read_config_defaults_and_overrides(tmp_path):
   assert navdy_hud.read_config(str(path)) == {"enabled": False, "bt_mac": "AA:BB:CC:DD:EE:FF"}
   path.write_text("{broken")
   assert navdy_hud.read_config(str(path))["enabled"] is True
+
+
+def _with_stock_lead(kind, distance):
+  sm = _sm()
+  sm.data["starpilotCarState"] = NS(leadObjectType=kind, leadObjectDistance=distance)
+  return sm
+
+
+def test_lead_gets_stock_acc_class_when_distances_agree():
+  packet = navdy_hud.build_packet(_with_stock_lead(4, 31.0), now=100.0)
+  assert packet["lead"]["k"] == 4
+  assert bt_link.slim_packet(packet)["lead"]["k"] == 4
+
+
+def test_lead_class_ignored_for_other_object_or_unknown_code():
+  assert "k" not in navdy_hud.build_packet(_with_stock_lead(2, 80.0), now=100.0)["lead"]   # stock ACC sees a farther object
+  assert "k" not in navdy_hud.build_packet(_with_stock_lead(1, 30.0), now=100.0)["lead"]   # undocumented code
+  assert "k" not in navdy_hud.build_packet(_with_stock_lead(0, 0.0), now=100.0)["lead"]
+  assert "k" not in navdy_hud.build_packet(_sm(), now=100.0)["lead"]                      # platform without it

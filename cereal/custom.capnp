@@ -110,6 +110,10 @@ struct StarPilotCarState @0xf35cc4560bbf6ec2 {
   accelHardCruise @28 :Bool;  # current/releasing accel cruise button came from GM hard-press signal
   decelHardCruise @29 :Bool;  # current/releasing decel cruise button came from GM hard-press signal
   pulseAndGlide @30 :Bool;  # developer-only wheel-button pulse-and-glide mode is enabled
+  # Class of the stock ACC's relevant (lead) object, from the stock ACC itself (VW MEB: MEB_ACC_01.Lead_Type).
+  # 0 = none/unknown, 2 = truck, 3 = car, 4 = motorcycle, 5 = bicycle. Platforms without it leave 0.
+  leadObjectType @31 :UInt8;
+  leadObjectDistance @32 :Float32;  # m, the distance the stock ACC reports for that object
 }
 
 struct StarPilotDeviceState @0xda96579883444c35 {

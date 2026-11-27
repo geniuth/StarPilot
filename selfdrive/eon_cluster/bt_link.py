@@ -111,7 +111,8 @@ KEEP_KEYS = (
   "tmapSignal",
 )
 # 검출 차량에서 앱이 쓰는 필드와 소수 자릿수. src/p 는 앱이 읽지 않는다.
-VEHICLE_FIELDS = (("d", 1), ("y", 1), ("v", 0), ("a", 1))
+# k = object class (2 truck, 3 car, 4 motorcycle, 5 bicycle), only when known.
+VEHICLE_FIELDS = (("d", 1), ("y", 1), ("v", 0), ("a", 1), ("k", 0))
 
 # 폴리라인 점 개수. 앱은 점 사이를 0.75m 간격으로 다시 쪼개 그리므로 원래 점이
 # 많을 필요가 없다. 그리는 구간(아래)만 남기면 이 정도로 충분하다.

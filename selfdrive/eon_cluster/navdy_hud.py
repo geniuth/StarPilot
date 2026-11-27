@@ -41,7 +41,13 @@ TRAFFIC_LAMPS = (("red", "isRedLightOn", "redLightRemainTime"),
 # carState is the only busy service here. msgq evicts every subscriber of a service once more than 15
 # readers attach, so this process must not add readers to carState/deviceState beyond this one.
 SERVICES = ["carState", "selfdriveState", "modelV2", "radarState",
-            "starpilotPlan", "starpilotRadarState", "naviData"]
+            "starpilotPlan", "starpilotRadarState", "starpilotCarState", "naviData"]
+
+# Lead object class from the stock ACC (StarPilotCarState.leadObjectType, VW MEB MEB_ACC_01.Lead_Type).
+# Sent as "k" on the lead; the HUD draws a matching model. Anything else stays a generic car (0).
+LEAD_KINDS = {2: 2, 3: 3, 4: 4, 5: 5}  # truck, car, motorcycle, bicycle
+LEAD_KIND_MATCH_M = 6.0      # stock ACC distance vs radarState lead distance
+LEAD_KIND_MATCH_RATIO = 0.2
 
 
 def _field(obj, name, default=0):
@@ -169,6 +175,17 @@ def navi_fields(navi, recent):
   return out
 
 
+def lead_kind(starpilot_car_state, lead) -> int:
+  """Class of radarState's lead if the stock ACC is looking at the same object, else 0."""
+  if lead is None:
+    return 0
+  kind = LEAD_KINDS.get(int(_finite(_field(starpilot_car_state, "leadObjectType", 0))), 0)
+  stock_d = _finite(_field(starpilot_car_state, "leadObjectDistance", 0.0))
+  if kind == 0 or stock_d <= 0.0:
+    return 0
+  return kind if abs(stock_d - lead["d"]) <= max(LEAD_KIND_MATCH_M, LEAD_KIND_MATCH_RATIO * lead["d"]) else 0
+
+
 def build_packet(sm, now=None):
   now = time.monotonic() if now is None else now
   car = sm["carState"]
@@ -189,6 +206,10 @@ def build_packet(sm, now=None):
 
   lead = _vehicle(_field(radar, "leadOne", None))
   lead2 = _vehicle(_field(radar, "leadTwo", None))
+  if lead is not None and "starpilotCarState" in sm.data:
+    kind = lead_kind(sm["starpilotCarState"], lead)
+    if kind:
+      lead["k"] = kind
   taken = [(v["d"], v["y"]) for v in (lead, lead2) if v]
 
   packet = {
