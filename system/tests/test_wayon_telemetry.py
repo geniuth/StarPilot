@@ -42,3 +42,19 @@ def test_wayon_processes_are_gated_on_cloud_config(tmp_path, monkeypatch):
   (tmp_path / "live.active").write_text("1")
   assert pc.wayon_remote_ready(False, None, None, None)
   assert pc.wayon_live_streaming(False, None, None, None)
+
+
+def test_tailscale_only_mode_swaps_tunnel_for_local_cloud(tmp_path, monkeypatch):
+  pc = pytest.importorskip("openpilot.system.manager.process_config")
+  config = tmp_path / "config.json"
+  monkeypatch.setattr(pc, "WAYON_CLOUD_CONFIG", str(config))
+  procs = pc.managed_processes
+  args = (False, None, None, None)
+
+  config.write_text('{"endpoint": "https://wayon-cloud.example.workers.dev", "token": "t"}')
+  assert procs["wayon_remote"].should_run(*args) and not procs["wayon_local"].should_run(*args)
+
+  config.write_text('{"endpoint": "http://127.0.0.1:8770", "token": "t"}')
+  import os
+  os.utime(config, (1, 2))  # new mtime so the cached endpoint is re-read
+  assert procs["wayon_local"].should_run(*args) and not procs["wayon_remote"].should_run(*args)

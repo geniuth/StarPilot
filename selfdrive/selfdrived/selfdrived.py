@@ -54,7 +54,7 @@ AUXILIARY_PROCESSES = frozenset({
   "stinger_object_shadow",
   "road_speed_limiter",  # NDA phone receiver
   "navdy_hud",           # Navdy HUD over Bluetooth
-  "wayon_live", "wayon_remote", "wayon_telemetry",  # MyID4 monitoring over Cloudflare
+  "wayon_live", "wayon_remote", "wayon_telemetry", "wayon_local",  # MyID4 monitoring
 })
 
 LONGITUDINAL_PERSONALITY_MAP = {v: k for k, v in log.LongitudinalPersonality.schema.enumerants.items()}

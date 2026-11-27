@@ -21,6 +21,7 @@ AUX_MODULES = {
   "system/wayon_vehicle_telemetry.py": set(),
   "system/wayon_live_stream.py": set(),
   "system/wayon_remote.py": set(),
+  "system/wayon_local_cloud.py": set(),
   "selfdrive/eon_cluster/navdy_hud.py": {"carState"},  # the only extra carState reader
 }
 

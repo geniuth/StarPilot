@@ -1,3 +1,4 @@
+import json
 import os
 import operator
 import platform
@@ -98,6 +99,26 @@ WAYON_LIVE_ACTIVE_PATH = "/tmp/wayon_live.active"
 
 def wayon_remote_ready(started: bool, params: Params, CP: car.CarParams, starpilot_toggles: SimpleNamespace) -> bool:
   return os.path.isfile(WAYON_CLOUD_CONFIG)
+
+_wayon_endpoint_cache: list = [None, ""]  # [config mtime, endpoint]
+
+def _wayon_endpoint() -> str:
+  try:
+    mtime = os.path.getmtime(WAYON_CLOUD_CONFIG)
+  except OSError:
+    return ""
+  if _wayon_endpoint_cache[0] != mtime:
+    try:
+      with open(WAYON_CLOUD_CONFIG, encoding="utf-8") as f:
+        _wayon_endpoint_cache[1] = str(json.load(f).get("endpoint") or "")
+    except (OSError, ValueError, AttributeError):
+      _wayon_endpoint_cache[1] = ""
+    _wayon_endpoint_cache[0] = mtime
+  return _wayon_endpoint_cache[1]
+
+def wayon_local_mode(started: bool, params: Params, CP: car.CarParams, starpilot_toggles: SimpleNamespace) -> bool:
+  """Tailscale-only MyID4: uploads go to the on-device server instead of the Cloudflare Worker."""
+  return _wayon_endpoint().startswith(("http://127.0.0.1", "http://localhost"))
 
 def wayon_live_streaming(started: bool, params: Params, CP: car.CarParams, starpilot_toggles: SimpleNamespace) -> bool:
   return os.path.isfile(WAYON_LIVE_ACTIVE_PATH)
@@ -236,7 +257,9 @@ procs += [
   PythonProcess("navdy_hud", "selfdrive.eon_cluster.navdy_hud", always_run, enabled=TICI),
   # MyID4 monitoring: 360 live view server, Cloudflare tunnel supervisor, vehicle telemetry upload.
   PythonProcess("wayon_live", "system.wayon_live_stream", wayon_remote_ready, enabled=TICI),
-  PythonProcess("wayon_remote", "system.wayon_remote", wayon_remote_ready, enabled=TICI),
+  # Cloudflare tunnel only when the uploads still go to the Worker; Tailscale-only mode runs wayon_local.
+  PythonProcess("wayon_remote", "system.wayon_remote", and_(wayon_remote_ready, not_(wayon_local_mode)), enabled=TICI),
+  PythonProcess("wayon_local", "system.wayon_local_cloud", and_(wayon_remote_ready, wayon_local_mode), enabled=TICI),
   PythonProcess("wayon_telemetry", "system.wayon_vehicle_telemetry", wayon_remote_ready, enabled=TICI),
   PythonProcess("wheel_controlsd", "starpilot.system.wheel_controls.wheel_controlsd", wheel_controls_enabled, enabled=TICI, nice=19),
   PythonProcess("the_galaxy", "starpilot.system.the_galaxy.the_galaxy", always_run, nice=10),
